@@ -8,7 +8,7 @@
     <!-- CORS 跨域过滤器 -->
     <filter>
         <filter-name>corsFilter</filter-name>
-        <filter-class>top.xihale.clouddoc.filter.CorsFilter</filter-class>
+        <filter-class>top.xihale.xdocs.filter.CorsFilter</filter-class>
     </filter>
     <filter-mapping>
         <filter-name>corsFilter</filter-name>
@@ -18,7 +18,7 @@
     <!-- 全局异常捕获过滤器 -->
     <filter>
         <filter-name>exceptionFilter</filter-name>
-        <filter-class>top.xihale.clouddoc.filter.ExceptionFilter</filter-class>
+        <filter-class>top.xihale.xdocs.filter.ExceptionFilter</filter-class>
     </filter>
     <filter-mapping>
         <filter-name>exceptionFilter</filter-name>
@@ -28,7 +28,7 @@
     <!-- 认证过滤器 -->
     <filter>
         <filter-name>authFilter</filter-name>
-        <filter-class>top.xihale.clouddoc.filter.AuthFilter</filter-class>
+        <filter-class>top.xihale.xdocs.filter.AuthFilter</filter-class>
     </filter>
     <filter-mapping>
         <filter-name>authFilter</filter-name>
@@ -38,7 +38,7 @@
     <!-- CSRF 过滤器 -->
     <filter>
         <filter-name>csrfFilter</filter-name>
-        <filter-class>top.xihale.clouddoc.filter.CsrfFilter</filter-class>
+        <filter-class>top.xihale.xdocs.filter.CsrfFilter</filter-class>
     </filter>
     <filter-mapping>
         <filter-name>csrfFilter</filter-name>

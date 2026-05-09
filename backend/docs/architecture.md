@@ -77,7 +77,7 @@ CloudDoc 是一个多人协作文档平台后端，基于 **Java 21 + 原生 Ser
 ## 3. 包结构
 
 ```
-top.xihale.clouddoc
+top.xihale.xdocs
 ├── config/          # 全局配置（CORS、JWT、存储、邮件）
 ├── constant/        # 枚举常量（角色、状态、可见性等）
 ├── dao/             # 数据访问层（静态方法，手写 SQL）
@@ -146,7 +146,7 @@ public class ArticleServlet extends BaseServlet {
 | `AuthFilter` | JWT 解析，用户状态注入，白名单放行 | 4 (最内) |
 
 **认证流程 (AuthFilter)：**
-1. 从 Cookie `clouddoc_token` 读取 JWT
+1. 从 Cookie `xdocs_token` 读取 JWT
 2. `JwtUtil.getUserId(token)` 提取 userId
 3. `UserService.findUserById()` 查数据库获取完整用户
 4. 将 `userId`、`role`、`currentUser`、`banned` 写入 request attribute

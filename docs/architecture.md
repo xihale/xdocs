@@ -61,7 +61,7 @@ Request
 ## 3. 后端目录结构
 
 ```text
-backend/src/main/java/top/xihale/clouddoc/
+backend/src/main/java/top/xihale/xdocs/
 ├── annotation/          ORM 注解
 │   ├── Column.java      覆盖列名映射
 │   ├── Id.java          标注主键字段

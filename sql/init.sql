@@ -2,7 +2,7 @@
 -- 云文档在线管理平台 - 测试数据
 -- ============================================================
 
-USE clouddoc;
+USE xdocs;
 
 -- 用户 (密码均为 123456 的 BCrypt hash, cost=12)
 INSERT INTO sys_user (username, password, email, nickname, avatar_url, role, status) VALUES

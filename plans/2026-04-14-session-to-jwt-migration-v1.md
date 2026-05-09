@@ -67,7 +67,7 @@
   jjwt 是 Java 生态最成熟的 JWT 库，0.12.x 支持 Java 21。
 
 - [x] **1.2 新建 `JwtUtil.java` 工具类**
-  位置：`top.xihale.clouddoc.util.JwtUtil`
+  位置：`top.xihale.xdocs.util.JwtUtil`
   功能：
   - `generateToken(int userId)` — 生成 JWT，payload 含 `userId` 和 `role`，有效期 7 天
   - `parseToken(String token)` → `DecodedJWT` 或自定义 record — 解析并验证签名
@@ -106,12 +106,12 @@
 
 - [x] **3.1 改造 `request.ts` — 添加请求拦截器**
   - 删除 `withCredentials: true`（不再需要 Cookie）
-  - 添加请求拦截器：从 `localStorage` 读取 `clouddoc-token`，设置 `Authorization: Bearer <token>` Header
+  - 添加请求拦截器：从 `localStorage` 读取 `xdocs-token`，设置 `Authorization: Bearer <token>` Header
   - 响应拦截器：遇到 401 时清除 token（现有逻辑已处理）
 
 - [x] **3.2 改造 `stores/user.ts` — Token 持久化**
-  - `login` / `register` 成功后，从响应中提取 `token` 并存入 `localStorage('clouddoc-token')`
-  - `clearSession` 方法：同时清除 `clouddoc-token`
+  - `login` / `register` 成功后，从响应中提取 `token` 并存入 `localStorage('xdocs-token')`
+  - `clearSession` 方法：同时清除 `xdocs-token`
   - `hydrate` 方法：先检查本地是否有 token，有则调用 `/api/auth/current` 验证有效性
   - `logout` 方法：清除本地 token
 

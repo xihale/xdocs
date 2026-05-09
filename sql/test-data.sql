@@ -2,7 +2,7 @@
 -- 云文档在线管理平台 - 测试数据
 -- ============================================================
 
-USE clouddoc;
+USE xdocs;
 
 -- 密码统一为 bcrypt 加密的 "123456"
 -- bcrypt hash for "123456": $2a$10$bALbGIwK4ay0EBQymF6VS.FMn1Eqe.QFPCDoEnjpTGdnoPqGYiGiq
@@ -10,11 +10,11 @@ USE clouddoc;
 
 -- ==================== 用户 ====================
 INSERT INTO sys_user (username, password, email, nickname, role, status) VALUES
-('admin',   '$2a$10$bALbGIwK4ay0EBQymF6VS.FMn1Eqe.QFPCDoEnjpTGdnoPqGYiGiq', 'admin@clouddoc.com',   '管理员',   1, 0),
-('zhangsan','$2a$10$bALbGIwK4ay0EBQymF6VS.FMn1Eqe.QFPCDoEnjpTGdnoPqGYiGiq', 'zhangsan@clouddoc.com','张三',     0, 0),
-('lisi',    '$2a$10$bALbGIwK4ay0EBQymF6VS.FMn1Eqe.QFPCDoEnjpTGdnoPqGYiGiq', 'lisi@clouddoc.com',    '李四',     0, 0),
-('wangwu',  '$2a$10$bALbGIwK4ay0EBQymF6VS.FMn1Eqe.QFPCDoEnjpTGdnoPqGYiGiq', 'wangwu@clouddoc.com',  '王五',     0, 0),
-('zhaoliu', '$2a$10$bALbGIwK4ay0EBQymF6VS.FMn1Eqe.QFPCDoEnjpTGdnoPqGYiGiq', 'zhaoliu@clouddoc.com', '赵六',     0, 0);
+('admin',   '$2a$10$bALbGIwK4ay0EBQymF6VS.FMn1Eqe.QFPCDoEnjpTGdnoPqGYiGiq', 'admin@xdocs.com',   '管理员',   1, 0),
+('zhangsan','$2a$10$bALbGIwK4ay0EBQymF6VS.FMn1Eqe.QFPCDoEnjpTGdnoPqGYiGiq', 'zhangsan@xdocs.com','张三',     0, 0),
+('lisi',    '$2a$10$bALbGIwK4ay0EBQymF6VS.FMn1Eqe.QFPCDoEnjpTGdnoPqGYiGiq', 'lisi@xdocs.com',    '李四',     0, 0),
+('wangwu',  '$2a$10$bALbGIwK4ay0EBQymF6VS.FMn1Eqe.QFPCDoEnjpTGdnoPqGYiGiq', 'wangwu@xdocs.com',  '王五',     0, 0),
+('zhaoliu', '$2a$10$bALbGIwK4ay0EBQymF6VS.FMn1Eqe.QFPCDoEnjpTGdnoPqGYiGiq', 'zhaoliu@xdocs.com', '赵六',     0, 0);
 
 -- ==================== 团队 ====================
 INSERT INTO team (name, description, owner_id) VALUES

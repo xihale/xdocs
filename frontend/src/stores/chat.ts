@@ -14,7 +14,7 @@ interface ChatState {
   setOpen: (articleId: number, open: boolean) => void;
 }
 
-const OPEN_KEY = "clouddoc-chat-open";
+const OPEN_KEY = "xdocs-chat-open";
 
 function loadOpenMap(): Record<number, boolean> {
   try {
@@ -40,7 +40,7 @@ export const useChatStore = create<ChatState>((set) => ({
 
 // ==================== In-memory cached localStorage helpers ====================
 
-const RECORDS_KEY = "clouddoc-chat-records";
+const RECORDS_KEY = "xdocs-chat-records";
 
 let _cache: Record<number, ArticleChatRecord> | null = null;
 

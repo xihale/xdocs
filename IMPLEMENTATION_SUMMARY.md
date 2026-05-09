@@ -14,12 +14,12 @@
 
 | 文件路径 | 测试类 | 测试方法数 | 覆盖服务 |
 |----------|--------|-----------|----------|
-| `backend/src/test/java/top/xihale/clouddoc/service/UserServiceTest.java` | UserServiceTest | 10 | 用户服务 |
-| `backend/src/test/java/top/xihale/clouddoc/service/ArticleServiceTest.java` | ArticleServiceTest | 10 | 文章服务 |
-| `backend/src/test/java/top/xihale/clouddoc/service/TeamServiceTest.java` | TeamServiceTest | 10 | 团队服务 |
-| `backend/src/test/java/top/xihale/clouddoc/service/KnowledgeBaseServiceTest.java` | KnowledgeBaseServiceTest | 10 | 知识库服务 |
-| `backend/src/test/java/top/xihale/clouddoc/service/ChatServiceTest.java` | ChatServiceTest | 3 | 聊天服务 |
-| `backend/src/test/java/top/xihale/clouddoc/service/UploadServiceTest.java` | UploadServiceTest | 6 | 文件上传服务 |
+| `backend/src/test/java/top/xihale/xdocs/service/UserServiceTest.java` | UserServiceTest | 10 | 用户服务 |
+| `backend/src/test/java/top/xihale/xdocs/service/ArticleServiceTest.java` | ArticleServiceTest | 10 | 文章服务 |
+| `backend/src/test/java/top/xihale/xdocs/service/TeamServiceTest.java` | TeamServiceTest | 10 | 团队服务 |
+| `backend/src/test/java/top/xihale/xdocs/service/KnowledgeBaseServiceTest.java` | KnowledgeBaseServiceTest | 10 | 知识库服务 |
+| `backend/src/test/java/top/xihale/xdocs/service/ChatServiceTest.java` | ChatServiceTest | 3 | 聊天服务 |
+| `backend/src/test/java/top/xihale/xdocs/service/UploadServiceTest.java` | UploadServiceTest | 6 | 文件上传服务 |
 
 **总计**: 6个测试类，60+个测试方法
 
@@ -153,7 +153,7 @@
 
 | 文档路径 | 内容 |
 |----------|------|
-| `backend/src/test/java/top/xihale/clouddoc/README_TESTS.md` | 后端测试文档 |
+| `backend/src/test/java/top/xihale/xdocs/README_TESTS.md` | 后端测试文档 |
 | `frontend/README_TESTS.md` | 前端测试文档 |
 | `TEST_COVERAGE.md` | 测试覆盖总览 |
 | `IMPLEMENTATION_SUMMARY.md` | 实现总结 |

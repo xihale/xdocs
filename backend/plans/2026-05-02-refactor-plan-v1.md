@@ -93,7 +93,7 @@
 ### 2.7 修复 JwtUtil 硬编码开发密钥
 
 - [ ] `JwtUtil.java:39`：当 `web.properties` 缺失或 `jwt.secret` 为空时，**抛出异常阻止启动**而非静默使用硬编码密钥
-- [ ] 仅在系统属性 `clouddoc.dev=true` 时允许使用开发密钥
+- [ ] 仅在系统属性 `xdocs.dev=true` 时允许使用开发密钥
 
 ---
 

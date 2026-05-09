@@ -45,10 +45,10 @@
 ```text
 登录/注册成功
   → JwtUtil.generateToken(userId)
-  → Cookie: clouddoc_token=<JWT>; HttpOnly; Path=/; Max-Age=604800 (7天)
+  → Cookie: xdocs_token=<JWT>; HttpOnly; Path=/; Max-Age=604800 (7天)
 
 每次 HTTP 请求
-  → AuthFilter 从 Cookie 读取 clouddoc_token
+  → AuthFilter 从 Cookie 读取 xdocs_token
   → JwtUtil.getUserId(token) 解析 userId
   → getCachedUser(userId) 查缓存 (60s TTL, ConcurrentHashMap)
   → request attribute: userId, role, currentUser, userStatus, banned
@@ -75,7 +75,7 @@
 |---|---|---|
 | 密钥 | `default-secret-key-at-least-32-bytes-long` | `web.properties: jwt.secret` |
 | 过期时间 | 604800 秒（7 天） | `web.properties: jwt.expiration` |
-| Cookie 名 | `clouddoc_token` | 硬编码 `AuthFilter.TOKEN_COOKIE_NAME` |
+| Cookie 名 | `xdocs_token` | 硬编码 `AuthFilter.TOKEN_COOKIE_NAME` |
 
 ## 3. CSRF 与 CORS
 

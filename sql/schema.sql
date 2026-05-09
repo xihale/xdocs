@@ -2,11 +2,11 @@
 -- 云文档在线管理平台 - 数据库建表脚本
 -- ============================================================
 
-CREATE DATABASE IF NOT EXISTS clouddoc
+CREATE DATABASE IF NOT EXISTS xdocs
     DEFAULT CHARACTER SET utf8mb4
     DEFAULT COLLATE utf8mb4_general_ci;
 
-USE clouddoc;
+USE xdocs;
 
 -- -----------------------------------------------------------
 -- 1. 用户表

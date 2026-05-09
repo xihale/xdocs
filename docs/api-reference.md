@@ -8,7 +8,7 @@
 |---|---|
 | 基路径 | `/api` |
 | 协议 | HTTP/HTTPS + WebSocket |
-| 认证 | JWT Cookie (`clouddoc_token`) |
+| 认证 | JWT Cookie (`xdocs_token`) |
 | Content-Type | `application/json`（大部分接口） |
 | 文件上传 | `multipart/form-data` |
 
@@ -47,7 +47,7 @@
 
 ### 1.4 认证方式
 
-- **HTTP 接口**：自动携带 `clouddoc_token` Cookie。标记 `@Public` 的接口无需登录。
+- **HTTP 接口**：自动携带 `xdocs_token` Cookie。标记 `@Public` 的接口无需登录。
 - **WebSocket 接口**：先调 `GET /api/auth/ws-token` 获取短期 token，连接时放入 query param `?token=<jwt>`。
 
 ---
@@ -86,7 +86,7 @@
 | password | string | 是 | 密码 |
 | turnstileToken | string | 是 | Cloudflare Turnstile 人机验证 token |
 
-**响应 data：** `User` 对象（不含 password）。同时设置 `clouddoc_token` Cookie。
+**响应 data：** `User` 对象（不含 password）。同时设置 `xdocs_token` Cookie。
 
 ### 2.3 POST `/api/auth/logout`
 
