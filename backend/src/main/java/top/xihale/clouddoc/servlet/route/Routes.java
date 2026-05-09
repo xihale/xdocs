@@ -1,0 +1,15 @@
+package top.xihale.clouddoc.servlet.route;
+
+import java.lang.annotation.ElementType;
+import java.lang.annotation.Retention;
+import java.lang.annotation.RetentionPolicy;
+import java.lang.annotation.Target;
+
+/**
+ * 路由注解容器
+ */
+@Target(ElementType.METHOD)
+@Retention(RetentionPolicy.RUNTIME)
+public @interface Routes {
+    Route[] value();
+}

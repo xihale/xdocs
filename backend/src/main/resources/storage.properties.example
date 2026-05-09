@@ -1,0 +1,3 @@
+file.storage.path=src/main/webapp/uploads/
+file.allowed.extensions=.jpg,.jpeg,.png,.gif,.webp,.svg
+file.max-size-bytes=10485760

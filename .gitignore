@@ -1,0 +1,37 @@
+# Maven
+backend/target/
+
+# IDE
+.idea/
+*.iml
+.vscode/
+.classpath
+.project
+.factorypath
+.settings/
+
+# Node
+node_modules/
+dist/
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Build
+*.class
+*.jar
+*.war
+
+# Logs
+*.log
+
+# Sensitive Configs
+backend/src/main/resources/*.properties
+!backend/src/main/resources/*.properties.example
+
+# Uploads
+backend/src/main/webapp/uploads/
+
+# Agent/Memory (local only)
+.commandcode/
