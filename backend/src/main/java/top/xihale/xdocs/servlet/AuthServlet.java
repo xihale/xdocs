@@ -57,8 +57,7 @@ public class AuthServlet extends BaseServlet {
 
         User user = UserService.register(username, password, email, nickname);
         setTokenCookie(res.getRawResponse(), user.getId());
-        user.setPassword(null);
-        res.ok(user);
+        res.ok(user.toVO());
     }
 
     @Public
@@ -75,8 +74,7 @@ public class AuthServlet extends BaseServlet {
 
         User user = UserService.login(username, password);
         setTokenCookie(res.getRawResponse(), user.getId());
-        user.setPassword(null);
-        res.ok(user);
+        res.ok(user.toVO());
     }
 
     @Public
@@ -94,8 +92,7 @@ public class AuthServlet extends BaseServlet {
             res.ok(null);
             return;
         }
-        user.setPassword(null);
-        res.ok(user);
+        res.ok(user.toVO());
     }
 
     @Public

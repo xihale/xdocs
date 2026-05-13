@@ -10,7 +10,6 @@ import java.net.http.HttpRequest;
 import java.net.http.HttpResponse;
 import java.nio.charset.StandardCharsets;
 import java.util.List;
-import java.util.Map;
 import java.util.logging.Level;
 import java.util.logging.Logger;
 
@@ -35,26 +34,13 @@ public class TurnstileUtils {
 
         try {
             String secret = WebConfig.getTurnstileSecret();
-            Map<String, String> params = Map.of(
-                    "secret", secret,
-                    "response", token
-            );
-
-            // 构建表单数据（URL 编码）
-            StringBuilder formData = new StringBuilder();
-            for (Map.Entry<String, String> entry : params.entrySet()) {
-                if (!formData.isEmpty()) {
-                    formData.append("&");
-                }
-                formData.append(URLEncoder.encode(entry.getKey(), StandardCharsets.UTF_8));
-                formData.append("=");
-                formData.append(URLEncoder.encode(entry.getValue(), StandardCharsets.UTF_8));
-            }
+            String formData = "secret=" + URLEncoder.encode(secret, StandardCharsets.UTF_8)
+                    + "&response=" + URLEncoder.encode(token, StandardCharsets.UTF_8);
 
             HttpRequest request = HttpRequest.newBuilder()
                     .uri(URI.create(VERIFY_URL))
                     .header("Content-Type", "application/x-www-form-urlencoded")
-                    .POST(HttpRequest.BodyPublishers.ofString(formData.toString()))
+                    .POST(HttpRequest.BodyPublishers.ofString(formData))
                     .build();
 
             HttpResponse<String> response = HTTP_CLIENT.send(request, HttpResponse.BodyHandlers.ofString());

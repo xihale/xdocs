@@ -9,7 +9,6 @@ import top.xihale.xdocs.servlet.route.Public;
 import top.xihale.xdocs.util.ResponseUtils;
 
 import java.io.IOException;
-import java.util.*;
 
 /**
  * 全局搜索接口
@@ -51,16 +50,6 @@ public class SearchServlet extends BaseServlet {
     private void handleSearchUsers(HttpServletRequest req, ResponseUtils.HttpResponse res) throws IOException {
         String keyword = requiredParam(req, "keyword");
         var users = UserService.searchByKeyword(keyword);
-        // 脱敏：不返回密码
-        List<Map<String, Object>> voList = new ArrayList<>();
-        for (var user : users) {
-            Map<String, Object> vo = new LinkedHashMap<>();
-            vo.put("id", user.getId());
-            vo.put("username", user.getUsername());
-            vo.put("nickname", user.getNickname());
-            vo.put("avatarUrl", user.getAvatarUrl());
-            voList.add(vo);
-        }
-        res.ok(voList);
+        res.ok(users.stream().map(top.xihale.xdocs.po.User::toVO).toList());
     }
 }

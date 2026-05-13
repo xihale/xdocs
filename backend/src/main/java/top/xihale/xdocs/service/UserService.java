@@ -103,10 +103,9 @@ public class UserService {
         return UserDao.INSTANCE.findByEmail(email).isEmpty();
     }
 
-    public static List<User> findAll() {
+    public static List<UserVO> findAll() {
         List<User> users = UserDao.INSTANCE.findAll();
-        users.forEach(u -> u.setPassword(null));
-        return users;
+        return users.stream().map(User::toVO).toList();
     }
 
     public static List<User> searchByKeyword(String keyword) {

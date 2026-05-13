@@ -10,6 +10,7 @@ import top.xihale.xdocs.annotation.Id;
 import top.xihale.xdocs.annotation.Table;
 import top.xihale.xdocs.constant.Role;
 import top.xihale.xdocs.constant.UserStatus;
+import top.xihale.xdocs.vo.UserVO;
 
 import java.time.LocalDateTime;
 
@@ -65,5 +66,22 @@ public class User {
         if (role != null) {
             this.role = role.getCode();
         }
+    }
+
+    /**
+     * 转为视图对象，不包含密码等敏感字段
+     */
+    public UserVO toVO() {
+        UserVO vo = new UserVO();
+        vo.setId(id);
+        vo.setUsername(username);
+        vo.setEmail(email);
+        vo.setNickname(nickname);
+        vo.setAvatarUrl(avatarUrl);
+        vo.setRole(role);
+        vo.setStatus(status);
+        vo.setCreateTime(createTime);
+        vo.setUpdateTime(updateTime);
+        return vo;
     }
 }
