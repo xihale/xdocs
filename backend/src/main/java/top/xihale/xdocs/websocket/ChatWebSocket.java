@@ -7,6 +7,7 @@ import jakarta.websocket.server.ServerEndpoint;
 import top.xihale.xdocs.po.User;
 import top.xihale.xdocs.service.ChatService;
 import top.xihale.xdocs.service.UserService;
+import top.xihale.xdocs.util.HtmlSanitizer;
 import top.xihale.xdocs.util.JsonUtils;
 
 import java.io.IOException;
@@ -96,6 +97,7 @@ public class ChatWebSocket extends BaseWebSocket {
             if ("chat".equals(type)) {
                 String content = (String) msg.get("content");
                 if (content == null || content.isBlank()) return;
+                content = HtmlSanitizer.stripHtml(content);
 
                 // 持久化到数据库
                 ChatService.sendMessage(Integer.parseInt(articleId), null, userInfo.userId, 0, content);

@@ -5,6 +5,7 @@ import jakarta.servlet.http.HttpServletRequest;
 import top.xihale.xdocs.service.ChatService;
 import top.xihale.xdocs.servlet.route.Get;
 import top.xihale.xdocs.servlet.route.Post;
+import top.xihale.xdocs.util.HtmlSanitizer;
 import top.xihale.xdocs.util.ResponseUtils;
 import top.xihale.xdocs.websocket.ChatWebSocket;
 
@@ -33,6 +34,7 @@ public class ChatServlet extends BaseServlet {
         int articleId = requiredIntParam(req, "articleId");
         Integer teamId = optionalIntParam(req, "teamId");
         String content = requiredParam(req, "content");
+        content = HtmlSanitizer.stripHtml(content);
         int messageType = optionalIntParamOrDefault(req, "messageType", 0);
 
         ChatService.sendMessage(articleId, teamId, senderId, messageType, content);

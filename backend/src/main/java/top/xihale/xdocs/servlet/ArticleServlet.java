@@ -10,6 +10,7 @@ import top.xihale.xdocs.servlet.route.Get;
 import top.xihale.xdocs.servlet.route.Post;
 import top.xihale.xdocs.servlet.route.Public;
 import top.xihale.xdocs.servlet.route.Put;
+import top.xihale.xdocs.util.HtmlSanitizer;
 import top.xihale.xdocs.util.ResponseUtils;
 import top.xihale.xdocs.vo.ArticleVO;
 
@@ -28,6 +29,7 @@ public class ArticleServlet extends BaseServlet {
         int kbId = requiredIntParam(req, "kbId");
         String title = requiredParam(req, "title");
         String content = optionalParam(req, "content");
+        if (content != null) content = HtmlSanitizer.sanitizeArticleContent(content);
 
         var article = ArticleService.createArticle(kbId, title, content, userId);
         res.ok(article);
@@ -39,6 +41,7 @@ public class ArticleServlet extends BaseServlet {
         int articleId = requiredIntParam(req, "id");
         String title = optionalParam(req, "title");
         String content = optionalParam(req, "content");
+        if (content != null) content = HtmlSanitizer.sanitizeArticleContent(content);
         String summary = optionalParam(req, "summary");
         Integer status = optionalIntParam(req, "status");
 
@@ -128,6 +131,7 @@ public class ArticleServlet extends BaseServlet {
         int userId = getRequiredUserId(req);
         int articleId = requiredIntParam(req, "id");
         String content = optionalParam(req, "content");
+        if (content != null) content = HtmlSanitizer.sanitizeArticleContent(content);
 
         ArticleService.checkArticleEditable(articleId, userId);
         Article article = ArticleService.findArticleById(articleId);
@@ -159,6 +163,7 @@ public class ArticleServlet extends BaseServlet {
         int userId = getRequiredUserId(req);
         int articleId = requiredIntParam(req, "articleId");
         String content = requiredParam(req, "content");
+        content = HtmlSanitizer.stripHtml(content);
         Integer parentId = optionalIntParam(req, "parentId");
         Integer replyToId = optionalIntParam(req, "replyToId");
 

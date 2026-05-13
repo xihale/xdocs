@@ -7,6 +7,7 @@ import { useChat } from "../hooks/useChat";
 import { useChatStore } from "../stores/chat";
 import { ChatSidebar } from "../components/ChatSidebar";
 import { ConfirmModal } from "../components/Modal";
+import DOMPurify from "dompurify";
 import { marked } from "marked";
 import { markedHighlight } from "marked-highlight";
 import hljs from "highlight.js";
@@ -285,7 +286,7 @@ export function ArticleDetailPage() {
     },
   ];
   const renderedHtml = useMemo(
-    () => (renderedContent ? (marked(renderedContent) as string) : ""),
+    () => (renderedContent ? DOMPurify.sanitize(marked(renderedContent) as string) : ""),
     [renderedContent],
   );
 
