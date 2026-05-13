@@ -22,7 +22,8 @@ public class TeamServlet extends BaseServlet {
         String name = requiredParam(req, "name");
         String description = optionalParam(req, "description");
 
-        res.ok(TeamService.createTeam(name, description, userId));
+        var team = TeamService.createTeam(name, description, userId);
+        res.ok(TeamService.buildTeamVO(team));
     }
 
     @Get("/list")

@@ -56,7 +56,7 @@ public class KnowledgeBaseService {
         return KnowledgeBaseDao.INSTANCE.findByOwnerId(ownerType, ownerId);
     }
 
-    public static void checkKbPermission(int kbId, int userId, KnowledgeBaseRole... requiredRoles) {
+    public static void ensureKbPermission(int kbId, int userId, KnowledgeBaseRole... requiredRoles) {
         findKnowledgeBaseById(kbId);
         KnowledgeBaseMember member = KnowledgeBaseMemberDao.INSTANCE.findByKbIdAndUserId(kbId, userId)
                 .orElseThrow(() -> new KbException(KbError.NOT_KB_MEMBER));

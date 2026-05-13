@@ -28,7 +28,8 @@ public class SearchServlet extends BaseServlet {
         int limit = optionalIntParamOrDefault(req, "limit", 20);
 
         var articles = ArticleService.searchPublicArticles(keyword, offset, limit);
-        res.ok(articles);
+        var voList = articles.stream().map(ArticleService::toVO).toList();
+        res.ok(voList);
     }
 
     /**

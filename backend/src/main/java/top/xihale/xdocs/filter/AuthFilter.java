@@ -31,9 +31,9 @@ public class AuthFilter implements Filter {
 
     public static final String TOKEN_COOKIE_NAME = "xdocs_token";
 
-    /** 用户缓存，避免每次请求查库。TTL 60 秒 */
+    /** 用户缓存，避免每次请求查库。TTL 600 秒 */
     private static final ConcurrentHashMap<Integer, CachedUser> userCache = new ConcurrentHashMap<>();
-    private static final long CACHE_TTL_MILLIS = 60_000L;
+    private static final long CACHE_TTL_MILLIS = 600_000L;
 
     /**
      * 通过 @Public 注解自动收集的公开路径白名单

@@ -82,7 +82,7 @@ public class ArticleService {
         return KnowledgeBaseDao.INSTANCE.findPublicByName(keyword);
     }
 
-    public static void checkArticleOwner(int articleId, int userId) {
+    public static void ensureArticleOwner(int articleId, int userId) {
         Article article = findArticleById(articleId);
         if (article.getAuthorId() != userId) {
             throw new ArticleException(ArticleError.NOT_ARTICLE_OWNER);
@@ -92,7 +92,7 @@ public class ArticleService {
     /**
      * 校验用户可编辑文章：作者 / 知识库 EDITOR 及以上 / TEAM 知识库的 TEAM 成员
      */
-    public static void checkArticleEditable(int articleId, int userId) {
+    public static void ensureArticleEditable(int articleId, int userId) {
         Article article = findArticleById(articleId);
         if (canUserEditArticle(article, userId)) {
             return;

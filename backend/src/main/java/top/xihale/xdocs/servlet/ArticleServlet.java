@@ -32,7 +32,7 @@ public class ArticleServlet extends BaseServlet {
         if (content != null) content = HtmlSanitizer.sanitizeArticleContent(content);
 
         var article = ArticleService.createArticle(kbId, title, content, userId);
-        res.ok(article);
+        res.ok(ArticleService.toVO(article, userId));
     }
 
     @Put("/update")
@@ -45,7 +45,7 @@ public class ArticleServlet extends BaseServlet {
         String summary = optionalParam(req, "summary");
         Integer status = optionalIntParam(req, "status");
 
-        ArticleService.checkArticleEditable(articleId, userId);
+        ArticleService.ensureArticleEditable(articleId, userId);
         Article article = ArticleService.findArticleById(articleId);
 
         int oldStatus = article.getStatus();
@@ -69,14 +69,14 @@ public class ArticleServlet extends BaseServlet {
             NotificationService.notifyFollowersArticleUpdated(articleId, article.getTitle(), article.getAuthorId());
         }
 
-        res.ok(article);
+        res.ok(ArticleService.toVO(article, userId));
     }
 
     @Delete("/delete")
     private void handleDelete(HttpServletRequest req, ResponseUtils.HttpResponse res) throws IOException {
         int userId = getRequiredUserId(req);
         int articleId = requiredIntParam(req, "id");
-        ArticleService.checkArticleEditable(articleId, userId);
+        ArticleService.ensureArticleEditable(articleId, userId);
         ArticleService.deleteArticle(articleId);
         res.ok();
     }
@@ -93,8 +93,10 @@ public class ArticleServlet extends BaseServlet {
     @Get("/list")
     private void handleListByKb(HttpServletRequest req, ResponseUtils.HttpResponse res) throws IOException {
         int kbId = requiredIntParam(req, "kbId");
+        Integer userId = getOptionalUserId(req);
         var articles = ArticleService.findByKnowledgeBase(kbId);
-        res.ok(articles);
+        var voList = articles.stream().map(a -> ArticleService.toVO(a, userId)).toList();
+        res.ok(voList);
     }
 
     @Public
@@ -133,11 +135,11 @@ public class ArticleServlet extends BaseServlet {
         String content = optionalParam(req, "content");
         if (content != null) content = HtmlSanitizer.sanitizeArticleContent(content);
 
-        ArticleService.checkArticleEditable(articleId, userId);
+        ArticleService.ensureArticleEditable(articleId, userId);
         Article article = ArticleService.findArticleById(articleId);
         if (content != null) article.setContent(content);
         ArticleService.updateArticle(article);
-        res.ok(article);
+        res.ok(ArticleService.toVO(article, userId));
     }
 
     // ==================== 点赞 ====================
