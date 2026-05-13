@@ -10,22 +10,25 @@ export function DashboardPage() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
   const [sort, setSort] = useState<"time" | "likes">("time");
+  const [page, setPage] = useState(1);
+  const PAGE_SIZE = 10;
   const [keyword, setKeyword] = useState("");
   const [searchResults, setSearchResults] = useState<null | { articles: ArticleVO[]; kbs: KnowledgeBase[]; users: SearchUser[] }>(null);
   const [searchTab, setSearchTab] = useState<"articles" | "kbs" | "users">("articles");
 
-  const loadArticles = useCallback(async (s: "time" | "likes" = sort) => {
+  const loadArticles = useCallback(async (s: "time" | "likes" = sort, p: number = page) => {
     setLoading(true);
     setError("");
     try {
-      const data = await articleApi.publicList(0, 30, s);
+      const offset = (p - 1) * PAGE_SIZE;
+      const data = await articleApi.publicList(offset, PAGE_SIZE + 1, s);
       setArticles(data);
     } catch (e: unknown) {
       setError(e instanceof Error ? e.message : String(e));
     } finally {
       setLoading(false);
     }
-  }, [sort]);
+  }, [sort, page]);
 
   useEffect(() => {
     loadArticles();
@@ -33,7 +36,8 @@ export function DashboardPage() {
 
   const handleSort = (s: "time" | "likes") => {
     setSort(s);
-    loadArticles(s);
+    setPage(1);
+    loadArticles(s, 1);
   };
 
   const handleSearch = async () => {
@@ -201,11 +205,30 @@ export function DashboardPage() {
           ) : articles.length === 0 ? (
             <div className="text-center py-20 text-on-surface-variant">暂无公开文章</div>
           ) : (
-            <ArticleList
-              articles={articles}
-              onNavigate={(id) => navigate(`/article/${id}`)}
-              showLikes
-            />
+            <>
+              <ArticleList
+                articles={articles.slice(0, PAGE_SIZE)}
+                onNavigate={(id) => navigate(`/article/${id}`)}
+                showLikes
+              />
+              <div className="flex items-center justify-center gap-4 mt-6">
+                <button
+                  disabled={page <= 1}
+                  onClick={() => { const p = page - 1; setPage(p); loadArticles(sort, p); }}
+                  className="px-4 py-2 text-sm border border-outline-variant disabled:opacity-40 disabled:cursor-not-allowed hover:bg-surface-container transition-colors"
+                >
+                  上一页
+                </button>
+                <span className="text-sm text-on-surface-variant">第 {page} 页</span>
+                <button
+                  disabled={articles.length <= PAGE_SIZE}
+                  onClick={() => { const p = page + 1; setPage(p); loadArticles(sort, p); }}
+                  className="px-4 py-2 text-sm border border-outline-variant disabled:opacity-40 disabled:cursor-not-allowed hover:bg-surface-container transition-colors"
+                >
+                  下一页
+                </button>
+              </div>
+            </>
           )}
         </>
       )}
