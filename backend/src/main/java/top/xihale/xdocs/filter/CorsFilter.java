@@ -41,15 +41,6 @@ public class CorsFilter implements Filter {
                     .header("Access-Control-Max-Age", "3600");
         }
 
-        // Content-Security-Policy: 禁止 inline script、禁止外部脚本/样式、禁止框架嵌入
-        resp.setHeader("Content-Security-Policy",
-                "default-src 'self'; " +
-                "script-src 'self'; " +
-                "style-src 'self' 'unsafe-inline'; " +
-                "img-src 'self' data: blob:; " +
-                "frame-ancestors 'none'; " +
-                "object-src 'none'");
-
         if ("OPTIONS".equalsIgnoreCase(req.getMethod())) {
             if (origin != null && !WebConfig.isAllowedOrigin(origin)) {
                 res.sendStatus(ResponseCode.FORBIDDEN);
