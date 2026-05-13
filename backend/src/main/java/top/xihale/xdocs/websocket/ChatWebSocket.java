@@ -49,7 +49,8 @@ public class ChatWebSocket extends BaseWebSocket {
     public void onOpen(Session session, @PathParam("articleId") String articleId) {
         if (!checkOrigin(session)) return;
 
-        Integer userId = resolveUserId(session);
+        // AuthFilter 已在 HTTP 层完成鉴权，WebSocketConfigurator 从 Cookie 提取 userId
+        Integer userId = (Integer) session.getUserProperties().get("userId");
         if (userId == null) {
             closeSession(session, "Unauthorized");
             return;
@@ -61,7 +62,6 @@ public class ChatWebSocket extends BaseWebSocket {
                 user.getAvatarUrl());
         sessionUserMap.put(session.getId(), userInfo);
 
-        session.getUserProperties().put("userId", userId);
         session.getUserProperties().put("articleId", articleId);
 
         roomManager.join(articleId, session);

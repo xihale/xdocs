@@ -39,13 +39,13 @@ public class NotificationWebSocket extends BaseWebSocket {
     public void onOpen(Session session) {
         if (!checkOrigin(session)) return;
 
-        Integer userId = resolveUserId(session);
+        // AuthFilter 已在 HTTP 层完成 Cookie JWT 鉴权，userId 已注入 request attribute
+        Integer userId = (Integer) session.getUserProperties().get("userId");
         if (userId == null) {
             closeSession(session, "Unauthorized");
             return;
         }
 
-        session.getUserProperties().put("userId", userId);
         userSessions.computeIfAbsent(userId, k -> ConcurrentHashMap.newKeySet()).add(session);
 
         instance = this;

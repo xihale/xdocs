@@ -25,40 +25,7 @@
             <version>${lombok.version}</version>
             <scope>provided</scope>
         </dependency>
-        <!-- JUnit 5 测试框架 -->
-        <dependency>
-            <groupId>org.junit.jupiter</groupId>
-            <artifactId>junit-jupiter</artifactId>
-            <version>5.11.4</version>
-            <scope>test</scope>
-        </dependency>
-        <!-- Mockito 模拟框架 -->
-        <dependency>
-            <groupId>org.mockito</groupId>
-            <artifactId>mockito-core</artifactId>
-            <version>5.14.2</version>
-            <scope>test</scope>
-        </dependency>
-        <dependency>
-            <groupId>org.mockito</groupId>
-            <artifactId>mockito-junit-jupiter</artifactId>
-            <version>5.14.2</version>
-            <scope>test</scope>
-        </dependency>
-        <!-- AssertJ 流畅断言 -->
-        <dependency>
-            <groupId>org.assertj</groupId>
-            <artifactId>assertj-core</artifactId>
-            <version>3.27.0</version>
-            <scope>test</scope>
-        </dependency>
-        <!-- JSON 断言 -->
-        <dependency>
-            <groupId>org.skyscreamer</groupId>
-            <artifactId>jsonassert</artifactId>
-            <version>1.5.3</version>
-            <scope>test</scope>
-        </dependency>
+
         <!-- BCrypt 密码加密 -->
         <dependency>
             <groupId>at.favre.lib</groupId>
@@ -92,13 +59,7 @@
             <version>2.2.0</version>
             <scope>provided</scope>
         </dependency>
-        <!-- Jakarta WebSocket 服务端实现依赖 -->
-        <dependency>
-            <groupId>jakarta.websocket</groupId>
-            <artifactId>jakarta.websocket-client-api</artifactId>
-            <version>2.2.0</version>
-            <scope>provided</scope>
-        </dependency>
+
         <!-- JJWT (JSON Web Token) -->
         <dependency>
             <groupId>io.jsonwebtoken</groupId>
@@ -117,12 +78,7 @@
             <version>0.12.6</version>
             <scope>runtime</scope>
         </dependency>
-        <!-- Commons IO 工具 -->
-        <dependency>
-            <groupId>commons-io</groupId>
-            <artifactId>commons-io</artifactId>
-            <version>2.19.0</version>
-        </dependency>
+
         <dependency>
             <groupId>org.eclipse.angus</groupId>
             <artifactId>jakarta.mail</artifactId>
@@ -146,14 +102,6 @@
                     </annotationProcessorPaths>
                     <source>21</source>
                     <target>21</target>
-                </configuration>
-            </plugin>
-            <plugin>
-                <groupId>org.apache.maven.plugins</groupId>
-                <artifactId>maven-surefire-plugin</artifactId>
-                <version>3.5.4</version>
-                <configuration>
-                    <argLine>--enable-preview</argLine>
                 </configuration>
             </plugin>
             <plugin>

@@ -1,5 +1,4 @@
 import { useEffect, useRef, useState } from "react";
-import { authApi } from "../api";
 import * as Y from "yjs";
 import { WebsocketProvider } from "y-websocket";
 import { Awareness } from "y-protocols/awareness";
@@ -134,71 +133,62 @@ export function useCollabProvider(
       }, 3000);
     };
 
-    const connect = async () => {
+    const connect = () => {
       if (!isCurrentConnection()) return;
       clearRetryTimer();
       providerRef.current?.destroy();
       providerRef.current = null;
       setProvider(null);
 
-      try {
-        setStatus("connecting");
-        const { token } = await authApi.wsToken();
-        if (!isCurrentConnection()) return;
+      setStatus("connecting");
 
-        const protocol = window.location.protocol === "https:" ? "wss:" : "ws:";
-        const host = window.location.host;
+      const protocol = window.location.protocol === "https:" ? "wss:" : "ws:";
+      const host = window.location.host;
 
-        const provider = new WebsocketProvider(
-          `${protocol}//${host}/api/collaboration`,
-          documentId,
-          doc,
-          { awareness, params: { token }, connect: true },
-        );
+      const provider = new WebsocketProvider(
+        `${protocol}//${host}/api/collaboration`,
+        documentId,
+        doc,
+        { awareness, connect: true },
+      );
 
-        if (!isCurrentConnection()) {
-          provider.destroy();
-          return;
-        }
-
-        providerRef.current = provider;
-        setProvider(provider);
-
-        // Set local awareness state
-        const color = pickColor(usernameRef.current);
-        awareness.setLocalStateField("user", { name: usernameRef.current, color });
-        emitUsers();
-
-        provider.on("status", ({ status: s }: { status: string }) => {
-          if (!isCurrentConnection()) return;
-          if (s === "connected") {
-            clearRetryTimer();
-            setStatus("connected");
-          } else if (s === "connecting") {
-            setStatus("connecting");
-          } else {
-            setStatus("disconnected");
-            scheduleReconnect();
-          }
-        });
-
-        provider.on("connection-close", () => {
-          if (!isCurrentConnection()) return;
-          setStatus("disconnected");
-          scheduleReconnect();
-        });
-
-        provider.on("connection-error", () => {
-          if (!isCurrentConnection()) return;
-          setStatus("disconnected");
-          scheduleReconnect();
-        });
-      } catch {
-        if (isCurrentConnection()) {
-          setStatus("disconnected");
-          scheduleReconnect();
-        }
+      if (!isCurrentConnection()) {
+        provider.destroy();
+        return;
       }
+
+      providerRef.current = provider;
+      setProvider(provider);
+
+      // Set local awareness state
+      const color = pickColor(usernameRef.current);
+      awareness.setLocalStateField("user", { name: usernameRef.current, color });
+      emitUsers();
+
+      provider.on("status", ({ status: s }: { status: string }) => {
+        if (!isCurrentConnection()) return;
+        if (s === "connected") {
+          clearRetryTimer();
+          setStatus("connected");
+        } else if (s === "connecting") {
+          setStatus("connecting");
+        } else {
+          setStatus("disconnected");
+          scheduleReconnect();
+        }
+      });
+
+      provider.on("connection-close", () => {
+        if (!isCurrentConnection()) return;
+        setStatus("disconnected");
+        scheduleReconnect();
+      });
+
+      provider.on("connection-error", () => {
+        if (!isCurrentConnection()) return;
+        setStatus("disconnected");
+        scheduleReconnect();
+      });
     };
 
     connect();

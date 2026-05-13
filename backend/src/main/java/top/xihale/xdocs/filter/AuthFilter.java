@@ -53,9 +53,18 @@ public class AuthFilter implements Filter {
             req.setCharacterEncoding("UTF-8");
         }
 
-        // WebSocket 升级请求由 @ServerEndpoint 自行通过 query param token 认证，
-        // 不走 Cookie 认证，直接放行以免 filter chain 阻断握手。
+        // WebSocket 升级请求：复用 Cookie JWT 鉴权，无效则直接 401 拒绝握手。
+        // 其余 filter（Cors/Csrf/Exception）仍无条件放行 WS 升级请求。
         if ("websocket".equalsIgnoreCase(req.getHeader("Upgrade"))) {
+            AuthState authState = resolveAuthState(req);
+            if (authState.userId() == null || authState.banned()) {
+                var res = ResponseUtils.of(resp);
+                res.error(ResponseCode.UNAUTHORIZED);
+                return;
+            }
+            // 将 userId 注入 request attribute，供 @OnOpen 读取
+            req.setAttribute("userId", authState.userId());
+            req.setAttribute("currentUser", authState.user());
             chain.doFilter(request, response);
             return;
         }

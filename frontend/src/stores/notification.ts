@@ -1,6 +1,6 @@
 import { create } from "zustand";
 import type { NotificationItem } from "../api/types";
-import { notificationApi, authApi } from "../api";
+import { notificationApi } from "../api";
 
 interface NotificationState {
   unreadCount: number;
@@ -87,45 +87,40 @@ export const useNotificationStore = create<NotificationState>((set, get) => ({
     const existing = get().ws;
     if (existing && existing.readyState === WebSocket.OPEN) return;
 
-    authApi.wsToken().then(({ token }) => {
-      const protocol = window.location.protocol === "https:" ? "wss:" : "ws:";
-      const wsUrl = `${protocol}//${window.location.host}/api/notification/ws?token=${token}`;
-      const ws = new WebSocket(wsUrl);
+    const protocol = window.location.protocol === "https:" ? "wss:" : "ws:";
+    const wsUrl = `${protocol}//${window.location.host}/api/notification/ws`;
+    const ws = new WebSocket(wsUrl);
 
-      ws.onmessage = (event) => {
-        try {
-          const msg = JSON.parse(event.data);
-          if (msg.type === "notification" && msg.data) {
-            const notification = msg.data as NotificationItem;
-            set((s) => ({
-              notifications: [notification, ...s.notifications].slice(0, 50),
-              unreadCount: s.unreadCount + 1,
-            }));
-          } else if (msg.type === "unread_count") {
-            set({ unreadCount: msg.count });
-          }
-        } catch {
-          // ignore
+    ws.onmessage = (event) => {
+      try {
+        const msg = JSON.parse(event.data);
+        if (msg.type === "notification" && msg.data) {
+          const notification = msg.data as NotificationItem;
+          set((s) => ({
+            notifications: [notification, ...s.notifications].slice(0, 50),
+            unreadCount: s.unreadCount + 1,
+          }));
+        } else if (msg.type === "unread_count") {
+          set({ unreadCount: msg.count });
         }
-      };
+      } catch {
+        // ignore
+      }
+    };
 
-      ws.onclose = () => {
-        set({ ws: null });
-        // Reconnect after 5 seconds
-        setTimeout(() => {
-          if (!get().ws) get().connectWs();
-        }, 5000);
-      };
+    ws.onclose = () => {
+      set({ ws: null });
+      // Reconnect after 5 seconds
+      setTimeout(() => {
+        if (!get().ws) get().connectWs();
+      }, 5000);
+    };
 
-      ws.onerror = () => {
-        ws.close();
-      };
+    ws.onerror = () => {
+      ws.close();
+    };
 
-      set({ ws });
-    }).catch(() => {
-      // wsToken failed, retry later
-      setTimeout(() => get().connectWs(), 10000);
-    });
+    set({ ws });
   },
 
   disconnectWs: () => {

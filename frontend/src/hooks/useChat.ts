@@ -1,5 +1,4 @@
 import { useEffect, useRef, useState, useCallback } from "react";
-import { authApi } from "../api";
 import { useChatStore, getChatMessages, saveChatMessages } from "../stores/chat";
 
 // ==================== WebSocket 消息类型 ====================
@@ -181,7 +180,7 @@ export function useChat(articleId: number): UseChatReturn {
       }
     };
 
-    const connect = async () => {
+    const connect = () => {
       if (!isCurrentConnection()) return;
       clearReconnectTimer();
 
@@ -191,16 +190,12 @@ export function useChat(articleId: number): UseChatReturn {
       }
 
       // Small delay to avoid connect/disconnect thrash during navigation
-      await new Promise<void>((r) => { setTimeout(r, 200); });
-      if (!isCurrentConnection()) return;
-
-      try {
-        const { token } = await authApi.wsToken();
+      setTimeout(() => {
         if (!isCurrentConnection()) return;
 
         const protocol = window.location.protocol === "https:" ? "wss:" : "ws:";
         const host = window.location.host;
-        const url = `${protocol}//${host}/api/chat/ws/${articleId}?token=${encodeURIComponent(token)}`;
+        const url = `${protocol}//${host}/api/chat/ws/${articleId}`;
 
         const ws = new WebSocket(url);
         wsRef.current = ws;
@@ -265,10 +260,7 @@ export function useChat(articleId: number): UseChatReturn {
             ws.close();
           }
         };
-      } catch {
-        if (!isCurrentConnection()) return;
-        scheduleReconnect();
-      }
+      }, 200);
     };
 
     connect();

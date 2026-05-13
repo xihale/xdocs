@@ -51,14 +51,14 @@ public class CollaborationWebSocket extends BaseWebSocket {
     public void onOpen(Session session, @PathParam("docId") String docId) {
         if (!checkOrigin(session)) return;
 
-        Integer userId = resolveUserId(session);
+        // AuthFilter 已在 HTTP 层完成鉴权，WebSocketConfigurator 从 Cookie 提取 userId
+        Integer userId = (Integer) session.getUserProperties().get("userId");
         if (userId == null) {
             closeSession(session, "Unauthorized");
             return;
         }
 
         User user = UserService.findUserById(userId);
-        session.getUserProperties().put("userId", userId);
         session.getUserProperties().put("nickname", user.getNickname());
         session.getUserProperties().put("docId", docId);
         session.setMaxIdleTimeout(600000); // 10 分钟超时

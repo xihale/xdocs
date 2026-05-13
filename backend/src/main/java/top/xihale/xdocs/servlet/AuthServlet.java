@@ -142,16 +142,6 @@ public class AuthServlet extends BaseServlet {
         res.ok("验证码已发送");
     }
 
-    @Get("/ws-token")
-    private void handleWsToken(HttpServletRequest req, ResponseUtils.HttpResponse res) throws IOException {
-        Integer userId = getOptionalUserId(req);
-        if (userId == null) {
-            throw new AuthException(AuthError.NOT_LOGGED_IN);
-        }
-        String token = JwtUtil.generateToken(userId);
-        res.ok(Map.of("token", token));
-    }
-
     @Public
     @Post("/reset-password")
     private void handleResetPassword(HttpServletRequest req, ResponseUtils.HttpResponse res) throws IOException {

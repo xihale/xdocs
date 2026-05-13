@@ -2,15 +2,14 @@ package top.xihale.xdocs.websocket;
 
 import jakarta.websocket.*;
 import top.xihale.xdocs.config.WebConfig;
-import top.xihale.xdocs.util.JwtUtil;
 
 import java.io.IOException;
-import java.util.Map;
 import java.util.logging.Level;
 import java.util.logging.Logger;
 
 /**
- * WebSocket 端点基类，提供公共的 CORS 校验、认证和工具方法
+ * WebSocket 端点基类，提供公共的 CORS 校验和工具方法。
+ * 认证由 AuthFilter 在 HTTP 层完成，WebSocketConfigurator 将 userId 注入 session userProperties。
  */
 public abstract class BaseWebSocket {
 
@@ -32,19 +31,6 @@ public abstract class BaseWebSocket {
             return false;
         }
         return true;
-    }
-
-    /**
-     * 从 query param token 中解析 userId
-     */
-    protected Integer resolveUserId(Session session) {
-        Map<String, java.util.List<String>> params = session.getRequestParameterMap();
-        if (params.get("token") != null && !params.get("token").isEmpty()) {
-            String token = params.get("token").get(0);
-            Integer userId = JwtUtil.getUserId(token);
-            if (userId != null) return userId;
-        }
-        return null;
     }
 
     /**

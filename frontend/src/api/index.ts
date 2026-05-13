@@ -126,9 +126,6 @@ export const authApi = {
       method: "POST",
       body: JSON.stringify({ email, code, newPassword }),
     }),
-
-  wsToken: () =>
-    request<{ token: string }>("/auth/ws-token", {}, "获取WebSocket令牌失败"),
 };
 
 // ==================== User ====================
