@@ -157,6 +157,9 @@ public class UserService {
     // ==================== 关注相关 ====================
 
     public static void follow(int followerId, int followingId) {
+        if (followerId == followingId) {
+            throw new UserException(UserError.CANNOT_FOLLOW_SELF);
+        }
         FollowUserDao.insert(followerId, followingId);
         NotificationService.notifyFollow(followingId, followerId);
     }
@@ -183,6 +186,18 @@ public class UserService {
 
     public static List<Integer> findFollowerIds(int userId) {
         return FollowUserDao.findFollowerIds(userId);
+    }
+
+    public static void ensureEmailAvailableForRegister(String email) {
+        if (UserDao.INSTANCE.findByEmail(email).isPresent()) {
+            throw new UserException(UserError.EMAIL_EXISTS);
+        }
+    }
+
+    public static void ensureEmailRegisteredForReset(String email) {
+        if (UserDao.INSTANCE.findByEmail(email).isEmpty()) {
+            throw new UserException(UserError.EMAIL_NOT_REGISTERED);
+        }
     }
 
     // ==================== 校验工具 ====================

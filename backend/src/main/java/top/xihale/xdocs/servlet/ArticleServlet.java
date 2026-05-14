@@ -4,7 +4,6 @@ import jakarta.servlet.annotation.WebServlet;
 import jakarta.servlet.http.HttpServletRequest;
 import top.xihale.xdocs.po.Article;
 import top.xihale.xdocs.service.ArticleService;
-import top.xihale.xdocs.service.NotificationService;
 import top.xihale.xdocs.servlet.route.Delete;
 import top.xihale.xdocs.servlet.route.Get;
 import top.xihale.xdocs.servlet.route.Post;
@@ -45,30 +44,8 @@ public class ArticleServlet extends BaseServlet {
         String summary = optionalParam(req, "summary");
         Integer status = optionalIntParam(req, "status");
 
-        ArticleService.ensureArticleEditable(articleId, userId);
-        Article article = ArticleService.findArticleById(articleId);
-
-        int oldStatus = article.getStatus();
-        boolean titleChanged = title != null && !title.equals(article.getTitle());
-        boolean contentChanged = content != null;
-        boolean summaryChanged = summary != null;
-
-        if (title != null) article.setTitle(title);
-        if (content != null) article.setContent(content);
-        if (summary != null) article.setSummary(summary);
-        if (status != null) article.setStatus(status);
-
-        ArticleService.updateArticle(article);
-
-        // 通知关注者：草稿 → 公开（首次发布）
-        if (oldStatus == 0 && article.getStatus() == 1) {
-            NotificationService.notifyFollowersNewArticle(articleId, article.getTitle(), article.getAuthorId());
-        }
-        // 通知关注者：已公开文章内容/标题/摘要更新
-        else if (oldStatus == 1 && article.getStatus() == 1 && (titleChanged || contentChanged || summaryChanged)) {
-            NotificationService.notifyFollowersArticleUpdated(articleId, article.getTitle(), article.getAuthorId());
-        }
-
+        ArticleService.updateArticle(articleId, title, content, summary, status, userId);
+        var article = ArticleService.findArticleById(articleId);
         res.ok(ArticleService.toVO(article, userId));
     }
 
@@ -76,8 +53,7 @@ public class ArticleServlet extends BaseServlet {
     private void handleDelete(HttpServletRequest req, ResponseUtils.HttpResponse res) throws IOException {
         int userId = getRequiredUserId(req);
         int articleId = requiredIntParam(req, "id");
-        ArticleService.ensureArticleEditable(articleId, userId);
-        ArticleService.deleteArticle(articleId);
+        ArticleService.deleteArticle(articleId, userId);
         res.ok();
     }
 
@@ -135,10 +111,7 @@ public class ArticleServlet extends BaseServlet {
         String content = optionalParam(req, "content");
         if (content != null) content = HtmlSanitizer.sanitizeArticleContent(content);
 
-        ArticleService.ensureArticleEditable(articleId, userId);
-        Article article = ArticleService.findArticleById(articleId);
-        if (content != null) article.setContent(content);
-        ArticleService.updateArticle(article);
+        var article = ArticleService.saveArticle(articleId, content, userId);
         res.ok(ArticleService.toVO(article, userId));
     }
 

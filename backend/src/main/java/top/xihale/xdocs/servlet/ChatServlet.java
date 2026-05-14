@@ -20,6 +20,7 @@ public class ChatServlet extends BaseServlet {
 
     @Get("/history")
     private void handleHistory(HttpServletRequest req, ResponseUtils.HttpResponse res) throws IOException {
+        getRequiredUserId(req);
         int articleId = requiredIntParam(req, "articleId");
         int limit = optionalIntParamOrDefault(req, "limit", 50);
 
@@ -28,6 +29,7 @@ public class ChatServlet extends BaseServlet {
 
     @Get("/online-members")
     private void handleOnlineMembers(HttpServletRequest req, ResponseUtils.HttpResponse res) throws IOException {
+        getRequiredUserId(req);
         String articleId = requiredParam(req, "articleId");
         var users = ChatWebSocket.getOnlineUsers(articleId);
         List<Map<String, Object>> voList = new ArrayList<>();

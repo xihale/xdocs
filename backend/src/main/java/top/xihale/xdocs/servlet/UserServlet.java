@@ -2,8 +2,6 @@ package top.xihale.xdocs.servlet;
 
 import jakarta.servlet.annotation.WebServlet;
 import jakarta.servlet.http.HttpServletRequest;
-import top.xihale.xdocs.exception.UserException;
-import top.xihale.xdocs.exception.UserException.UserError;
 import top.xihale.xdocs.service.ArticleService;
 import top.xihale.xdocs.service.UserService;
 import top.xihale.xdocs.servlet.route.Delete;
@@ -65,9 +63,6 @@ public class UserServlet extends BaseServlet {
     private void handleFollow(HttpServletRequest req, ResponseUtils.HttpResponse res) throws IOException {
         int followerId = getRequiredUserId(req);
         int followingId = requiredIntParam(req, "userId");
-        if (followerId == followingId) {
-            throw new UserException(UserError.CANNOT_FOLLOW_SELF);
-        }
         UserService.follow(followerId, followingId);
         res.ok(Map.of("followed", true));
     }

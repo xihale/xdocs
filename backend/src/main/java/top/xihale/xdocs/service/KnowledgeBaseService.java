@@ -58,7 +58,26 @@ public class KnowledgeBaseService {
         return KnowledgeBaseDao.INSTANCE.findByOwnerId(ownerType, ownerId);
     }
 
-    public static void ensureKbPermission(int kbId, int userId, KnowledgeBaseRole... requiredRoles) {
+    public static void updateKnowledgeBase(int kbId, String name, String description, int operatorId) {
+        ensureKbPermission(kbId, operatorId, KnowledgeBaseRole.OWNER, KnowledgeBaseRole.ADMIN);
+        KnowledgeBase kb = findKnowledgeBaseById(kbId);
+        if (name != null) kb.setName(name);
+        if (description != null) kb.setDescription(description);
+        KnowledgeBaseDao.INSTANCE.update(kb);
+    }
+
+    public static void deleteKnowledgeBase(int kbId, int operatorId) {
+        ensureKbPermission(kbId, operatorId, KnowledgeBaseRole.OWNER);
+        // 级联删除：成员 → 文章（含评论、点赞、收藏、浏览记录） → 知识库
+        KnowledgeBaseMemberDao.INSTANCE.deleteByKbId(kbId);
+        var articles = ArticleDao.INSTANCE.findByKnowledgeBaseId(kbId);
+        for (var article : articles) {
+            ArticleService.deleteArticleData(article.getId());
+        }
+        KnowledgeBaseDao.INSTANCE.deleteById(kbId);
+    }
+
+    private static void ensureKbPermission(int kbId, int userId, KnowledgeBaseRole... requiredRoles) {
         findKnowledgeBaseById(kbId);
         KnowledgeBaseMember member = KnowledgeBaseMemberDao.INSTANCE.findByKbIdAndUserId(kbId, userId)
                 .orElseThrow(() -> new KbException(KbError.NOT_KB_MEMBER));
@@ -66,21 +85,6 @@ public class KnowledgeBaseService {
             if (member.getRole() == required.getCode()) return;
         }
         throw new KbException(KbError.KB_PERMISSION_DENIED);
-    }
-
-    public static void updateKnowledgeBase(KnowledgeBase kb) {
-        KnowledgeBaseDao.INSTANCE.update(kb);
-    }
-
-    public static void deleteKnowledgeBase(int id) {
-        findKnowledgeBaseById(id);
-        // 级联删除：成员 → 文章（含评论、点赞、收藏、浏览记录） → 知识库
-        KnowledgeBaseMemberDao.INSTANCE.deleteByKbId(id);
-        var articles = ArticleDao.INSTANCE.findByKnowledgeBaseId(id);
-        for (var article : articles) {
-            ArticleService.deleteArticle(article.getId());
-        }
-        KnowledgeBaseDao.INSTANCE.deleteById(id);
     }
 
     public static void authorizeMember(int kbId, int userId, int role, int inviterId) {

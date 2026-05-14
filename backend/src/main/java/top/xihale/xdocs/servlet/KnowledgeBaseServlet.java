@@ -40,13 +40,8 @@ public class KnowledgeBaseServlet extends BaseServlet {
         String name = optionalParam(req, "name");
         String description = optionalParam(req, "description");
 
-        KnowledgeBaseService.ensureKbPermission(kbId, userId,
-                KnowledgeBaseRole.OWNER, KnowledgeBaseRole.ADMIN);
+        KnowledgeBaseService.updateKnowledgeBase(kbId, name, description, userId);
         var kb = KnowledgeBaseService.findKnowledgeBaseById(kbId);
-        if (name != null) kb.setName(name);
-        if (description != null) kb.setDescription(description);
-
-        KnowledgeBaseService.updateKnowledgeBase(kb);
         res.ok(KnowledgeBaseService.toVO(kb));
     }
 
@@ -54,8 +49,7 @@ public class KnowledgeBaseServlet extends BaseServlet {
     private void handleDelete(HttpServletRequest req, ResponseUtils.HttpResponse res) throws IOException {
         int userId = getRequiredUserId(req);
         int kbId = requiredIntParam(req, "id");
-        KnowledgeBaseService.ensureKbPermission(kbId, userId, KnowledgeBaseRole.OWNER);
-        KnowledgeBaseService.deleteKnowledgeBase(kbId);
+        KnowledgeBaseService.deleteKnowledgeBase(kbId, userId);
         res.ok();
     }
 

@@ -7,8 +7,6 @@ import jakarta.servlet.http.HttpServletResponse;
 import jakarta.servlet.http.HttpSession;
 import top.xihale.xdocs.exception.AuthException;
 import top.xihale.xdocs.exception.AuthException.AuthError;
-import top.xihale.xdocs.exception.UserException;
-import top.xihale.xdocs.exception.UserException.UserError;
 import top.xihale.xdocs.filter.AuthFilter;
 import top.xihale.xdocs.po.User;
 import top.xihale.xdocs.service.UserService;
@@ -126,13 +124,9 @@ public class AuthServlet extends BaseServlet {
 
         // 如果是重置密码，校验邮箱是否存在
         if ("reset".equals(type)) {
-            if (UserService.emailNotExists(email)) {
-                throw new UserException(UserError.EMAIL_NOT_REGISTERED);
-            }
+            UserService.ensureEmailRegisteredForReset(email);
         } else if ("register".equals(type)) {
-            if (UserService.emailExists(email)) {
-                throw new UserException(UserError.EMAIL_EXISTS);
-            }
+            UserService.ensureEmailAvailableForRegister(email);
         }
 
         HttpSession session = req.getSession();

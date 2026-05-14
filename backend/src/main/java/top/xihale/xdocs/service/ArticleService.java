@@ -92,7 +92,7 @@ public class ArticleService {
     /**
      * 校验用户可编辑文章：作者 / 知识库 EDITOR 及以上 / TEAM 知识库的 TEAM 成员
      */
-    public static void ensureArticleEditable(int articleId, int userId) {
+    private static void ensureArticleEditable(int articleId, int userId) {
         Article article = findArticleById(articleId);
         if (canUserEditArticle(article, userId)) {
             return;
@@ -134,12 +134,57 @@ public class ArticleService {
                 .isPresent();
     }
 
-    public static void updateArticle(Article article) {
+    /**
+     * 更新文章
+     */
+    public static void updateArticle(int articleId, String title, String content, String summary, Integer status, int operatorId) {
+        ensureArticleEditable(articleId, operatorId);
+        Article article = findArticleById(articleId);
+        int oldStatus = article.getStatus();
+        boolean titleChanged = title != null && !title.equals(article.getTitle());
+        boolean contentChanged = content != null;
+        boolean summaryChanged = summary != null;
+
+        if (title != null) article.setTitle(title);
+        if (content != null) article.setContent(content);
+        if (summary != null) article.setSummary(summary);
+        if (status != null) article.setStatus(status);
+
         ArticleDao.INSTANCE.update(article);
+
+        // 通知关注者：草稿 → 公开（首次发布）
+        if (oldStatus == 0 && article.getStatus() == 1) {
+            NotificationService.notifyFollowersNewArticle(articleId, article.getTitle(), article.getAuthorId());
+        }
+        // 通知关注者：已公开文章内容/标题/摘要更新
+        else if (oldStatus == 1 && article.getStatus() == 1 && (titleChanged || contentChanged || summaryChanged)) {
+            NotificationService.notifyFollowersArticleUpdated(articleId, article.getTitle(), article.getAuthorId());
+        }
     }
 
-    public static void deleteArticle(int id) {
-        // 级联删除：评论、点赞、收藏、浏览记录
+    /**
+     * 保存文章内容
+     */
+    public static Article saveArticle(int articleId, String content, int operatorId) {
+        ensureArticleEditable(articleId, operatorId);
+        Article article = findArticleById(articleId);
+        if (content != null) article.setContent(content);
+        ArticleDao.INSTANCE.update(article);
+        return article;
+    }
+
+    /**
+     * 删除文章
+     */
+    public static void deleteArticle(int articleId, int operatorId) {
+        ensureArticleEditable(articleId, operatorId);
+        deleteArticleData(articleId);
+    }
+
+    /**
+     * 级联删除文章数据（无鉴权，仅供内部级联调用）
+     */
+    public static void deleteArticleData(int id) {
         CommentDao.INSTANCE.deleteByArticleId(id);
         ArticleLikeDao.deleteByArticleId(id);
         FavoriteDao.deleteByTargetId(FavoriteDao.TYPE_ARTICLE, id);
