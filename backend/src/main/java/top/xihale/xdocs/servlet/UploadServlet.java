@@ -12,11 +12,9 @@ import top.xihale.xdocs.servlet.route.Post;
 import top.xihale.xdocs.util.Result;
 
 import java.io.IOException;
-import java.io.InputStream;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.Paths;
-import java.nio.file.StandardCopyOption;
 import java.util.HashMap;
 import java.util.Map;
 import java.util.UUID;
@@ -36,12 +34,13 @@ public class UploadServlet extends BaseServlet {
             throw new ParamException(ParamError.FILE_REQUIRED);
         }
 
-        String fileUrl = saveFile(filePart, "image");
-        UploadService.uploadFile("image", null, filePart.getSubmittedFileName(), fileUrl, filePart.getSize(), userId);
+        String fileName = saveFile(filePart, "image");
+        String fileUrl = "/uploads/image/" + fileName;
+        UploadService.uploadFile("image", null, fileName, fileUrl, filePart.getSize(), userId);
 
         Map<String, Object> data = new HashMap<>();
         data.put("url", fileUrl);
-        data.put("fileName", filePart.getSubmittedFileName());
+        data.put("fileName", fileName);
         return Result.success(data);
     }
 
@@ -53,8 +52,9 @@ public class UploadServlet extends BaseServlet {
             throw new ParamException(ParamError.FILE_REQUIRED);
         }
 
-        String fileUrl = saveFile(filePart, "avatar");
-        UploadService.uploadFile("avatar", userId, filePart.getSubmittedFileName(), fileUrl, filePart.getSize(), userId);
+        String fileName = saveFile(filePart, "avatar");
+        String fileUrl = "/uploads/avatar/" + fileName;
+        UploadService.uploadFile("avatar", userId, fileName, fileUrl, filePart.getSize(), userId);
 
         // 同时更新用户头像
         top.xihale.xdocs.service.UserService.updateAvatar(userId, fileUrl);
@@ -64,6 +64,9 @@ public class UploadServlet extends BaseServlet {
         return Result.success(data);
     }
 
+    /**
+     * 保存上传文件到磁盘，返回生成的 UUID 文件名（含扩展名）
+     */
     private String saveFile(Part filePart, String bizType) throws IOException {
         String originalName = filePart.getSubmittedFileName();
         if (originalName == null || originalName.isBlank()) {
@@ -81,6 +84,20 @@ public class UploadServlet extends BaseServlet {
             throw new ParamException(ParamError.FILE_TOO_LARGE);
         }
 
+        // 读取上传内容到字节数组（后续需要做 magic number 校验和 SVG sanitize）
+        byte[] content = filePart.getInputStream().readAllBytes();
+
+        // Tika magic number 校验
+        String detectedType = top.xihale.xdocs.util.FileTypeUtil.detectMimeType(content);
+        if (!top.xihale.xdocs.util.FileTypeUtil.isAllowed(detectedType, ext)) {
+            throw new ParamException(ParamError.FILE_TYPE_NOT_ALLOWED);
+        }
+
+        // SVG sanitize：剥离 script 和事件属性
+        if ("svg".equalsIgnoreCase(ext)) {
+            content = top.xihale.xdocs.util.SvgSanitizer.sanitize(content);
+        }
+
         // 生成 UUID 文件名
         String newFileName = UUID.randomUUID().toString().replace("-", "") + "." + ext;
 
@@ -88,13 +105,9 @@ public class UploadServlet extends BaseServlet {
         Path dir = Paths.get(StorageConfig.getStoragePath(), bizType);
         Files.createDirectories(dir);
         Path targetPath = dir.resolve(newFileName);
+        Files.write(targetPath, content);
 
-        try (InputStream in = filePart.getInputStream()) {
-            Files.copy(in, targetPath, StandardCopyOption.REPLACE_EXISTING);
-        }
-
-        // 返回 URL 路径
-        return "/uploads/" + bizType + "/" + newFileName;
+        return newFileName;
     }
 
     private String getExtension(String fileName) {
