@@ -67,7 +67,6 @@ public final class JwtUtil {
     public static String generateToken(int userId) {
         long now = System.currentTimeMillis();
         return Jwts.builder()
-                .subject(String.valueOf(userId))
                 .claim("userId", userId)
                 .issuedAt(new Date(now))
                 .expiration(new Date(now + EXPIRATION_MILLIS))
@@ -107,11 +106,6 @@ public final class JwtUtil {
         if (userId instanceof Number number) {
             return number.intValue();
         }
-        // fallback: 从 subject 中解析
-        try {
-            return Integer.parseInt(claims.getSubject());
-        } catch (NumberFormatException e) {
-            return null;
-        }
+        return null;
     }
 }
