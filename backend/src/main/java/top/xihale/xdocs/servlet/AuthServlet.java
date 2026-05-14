@@ -22,6 +22,7 @@ import java.io.IOException;
 import java.security.SecureRandom;
 import java.time.Instant;
 import java.util.Map;
+import java.util.concurrent.atomic.AtomicInteger;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.Executors;
 import java.util.concurrent.ScheduledExecutorService;
@@ -33,7 +34,14 @@ import java.util.concurrent.TimeUnit;
 @WebServlet("/api/auth/*")
 public class AuthServlet extends BaseServlet {
     private static final long EMAIL_CODE_SEND_INTERVAL_SECONDS = 60;
+    private static final int MAX_CODE_CHECK_ATTEMPTS = 5;
+    private static final long RATE_LIMIT_WINDOW_SECONDS = 24 * 3600; // 1 天
+    private static final int IP_RATE_LIMIT_MAX_REQUESTS = 10;
+    private static final int ACCOUNT_RATE_LIMIT_MAX_REQUESTS = 10;
     private static final ConcurrentHashMap<String, Long> emailCodeLastSentAtMap = new ConcurrentHashMap<>();
+    private static final ConcurrentHashMap<String, AtomicInteger> codeCheckAttemptsMap = new ConcurrentHashMap<>();
+    private static final ConcurrentHashMap<String, RateLimitEntry> ipRateLimitMap = new ConcurrentHashMap<>();
+    private static final ConcurrentHashMap<String, RateLimitEntry> accountRateLimitMap = new ConcurrentHashMap<>();
 
     static {
         // 后台定时清理过期限流记录，每 5 分钟执行一次
@@ -47,14 +55,34 @@ public class AuthServlet extends BaseServlet {
             long now = Instant.now().getEpochSecond();
             emailCodeLastSentAtMap.entrySet().removeIf(e -> now - e.getValue() >= EMAIL_CODE_SEND_INTERVAL_SECONDS);
         }, interval, interval, TimeUnit.SECONDS);
+        // 定时清理验证码尝试次数记录（5 分钟过期）
+        ScheduledExecutorService attemptCleaner = Executors.newSingleThreadScheduledExecutor(r -> {
+            Thread t = new Thread(r, "code-attempt-cleaner");
+            t.setDaemon(true);
+            return t;
+        });
+        attemptCleaner.scheduleAtFixedRate(codeCheckAttemptsMap::clear, 5, 5, TimeUnit.MINUTES);
+        // 定时清理限流记录（IP + 账号）
+        ScheduledExecutorService rateLimitCleaner = Executors.newSingleThreadScheduledExecutor(r -> {
+            Thread t = new Thread(r, "rate-limit-cleaner");
+            t.setDaemon(true);
+            return t;
+        });
+        rateLimitCleaner.scheduleAtFixedRate(() -> {
+            long now = Instant.now().getEpochSecond();
+            ipRateLimitMap.entrySet().removeIf(e -> now - e.getValue().windowStart >= RATE_LIMIT_WINDOW_SECONDS);
+            accountRateLimitMap.entrySet().removeIf(e -> now - e.getValue().windowStart >= RATE_LIMIT_WINDOW_SECONDS);
+        }, RATE_LIMIT_WINDOW_SECONDS, RATE_LIMIT_WINDOW_SECONDS, TimeUnit.SECONDS);
     }
 
     @Public
     @Post("/register")
     private void handleRegister(HttpServletRequest req, ResponseUtils.HttpResponse res) throws IOException {
+        checkIpRateLimit(req, "register");
         String username = requiredParam(req, "username");
         String password = requiredParam(req, "password");
         String email = requiredParam(req, "email");
+        checkAccountRateLimit("register:" + email.toLowerCase());
         String code = requiredParam(req, "code");
         String nickname = optionalParam(req, "nickname");
 
@@ -63,12 +91,19 @@ public class AuthServlet extends BaseServlet {
         String sessionCode = (String) session.getAttribute("emailCode");
         String sessionEmail = (String) session.getAttribute("emailForCode");
 
+        // 检查验证码尝试次数
+        String attemptKey = "register:" + session.getId();
+        if (isCodeCheckExhausted(attemptKey, session)) {
+            throw new AuthException(AuthError.EMAIL_CODE_INVALID);
+        }
+
         if (sessionCode == null || !sessionCode.equalsIgnoreCase(code) || !email.equals(sessionEmail)) {
             throw new AuthException(AuthError.EMAIL_CODE_INVALID);
         }
         // 校验通过后清除
         session.removeAttribute("emailCode");
         session.removeAttribute("emailForCode");
+        codeCheckAttemptsMap.remove(attemptKey);
 
         User user = UserService.register(username, password, email, nickname);
         setTokenCookie(res.getRawResponse(), user.getId());
@@ -78,7 +113,9 @@ public class AuthServlet extends BaseServlet {
     @Public
     @Post("/login")
     private void handleLogin(HttpServletRequest req, ResponseUtils.HttpResponse res) throws IOException {
+        checkIpRateLimit(req, "login");
         String username = requiredParam(req, "username");
+        checkAccountRateLimit("login:" + username.toLowerCase());
         String password = requiredParam(req, "password");
         String turnstileToken = requiredParam(req, "turnstileToken");
 
@@ -154,7 +191,9 @@ public class AuthServlet extends BaseServlet {
     @Public
     @Post("/reset-password")
     private void handleResetPassword(HttpServletRequest req, ResponseUtils.HttpResponse res) throws IOException {
+        checkIpRateLimit(req, "reset-password");
         String email = requiredParam(req, "email");
+        checkAccountRateLimit("reset-password:" + email.toLowerCase());
         String code = requiredParam(req, "code");
         String newPassword = requiredParam(req, "newPassword");
 
@@ -162,14 +201,77 @@ public class AuthServlet extends BaseServlet {
         String sessionCode = (String) session.getAttribute("emailCode");
         String sessionEmail = (String) session.getAttribute("emailForCode");
 
+        // 检查验证码尝试次数
+        String attemptKey = "reset:" + session.getId();
+        if (isCodeCheckExhausted(attemptKey, session)) {
+            throw new AuthException(AuthError.VERIFY_CODE_INVALID);
+        }
+
         if (sessionCode == null || !sessionCode.equalsIgnoreCase(code) || !email.equals(sessionEmail)) {
             throw new AuthException(AuthError.VERIFY_CODE_INVALID);
         }
         session.removeAttribute("emailCode");
         session.removeAttribute("emailForCode");
+        codeCheckAttemptsMap.remove(attemptKey);
 
         UserService.resetPassword(email, newPassword);
         res.ok("密码已重置");
+    }
+
+    /**
+     * 限流记录
+     */
+    private static class RateLimitEntry {
+        final long windowStart;
+        final AtomicInteger count;
+
+        RateLimitEntry(long windowStart) {
+            this.windowStart = windowStart;
+            this.count = new AtomicInteger(1);
+        }
+    }
+
+    /**
+     * IP 级限流检查，超过阈值抛出 429
+     */
+    private void checkIpRateLimit(HttpServletRequest req, String action) {
+        String key = "ip:" + action + ":" + req.getRemoteAddr();
+        checkRateLimit(ipRateLimitMap, key, IP_RATE_LIMIT_MAX_REQUESTS);
+    }
+
+    /**
+     * 账号级限流检查，超过阈值抛出 429
+     */
+    private void checkAccountRateLimit(String key) {
+        checkRateLimit(accountRateLimitMap, "account:" + key, ACCOUNT_RATE_LIMIT_MAX_REQUESTS);
+    }
+
+    private void checkRateLimit(ConcurrentHashMap<String, RateLimitEntry> map, String key, int maxRequests) {
+        long now = Instant.now().getEpochSecond();
+        RateLimitEntry limit = map.compute(key, (k, existing) -> {
+            if (existing == null || now - existing.windowStart >= RATE_LIMIT_WINDOW_SECONDS) {
+                return new RateLimitEntry(now);
+            }
+            existing.count.incrementAndGet();
+            return existing;
+        });
+        if (limit.count.get() > maxRequests) {
+            throw new AuthException(AuthError.EMAIL_CODE_TOO_FREQUENT);
+        }
+    }
+
+    /**
+     * 检查验证码校验次数是否已耗尽，若未耗尽则递增计数
+     */
+    private boolean isCodeCheckExhausted(String attemptKey, HttpSession session) {
+        AtomicInteger attempts = codeCheckAttemptsMap.computeIfAbsent(attemptKey, k -> new AtomicInteger(0));
+        if (attempts.incrementAndGet() > MAX_CODE_CHECK_ATTEMPTS) {
+            // 耗尽次数，使验证码失效
+            session.removeAttribute("emailCode");
+            session.removeAttribute("emailForCode");
+            return true;
+        }
+        return false;
     }
 
     /**
