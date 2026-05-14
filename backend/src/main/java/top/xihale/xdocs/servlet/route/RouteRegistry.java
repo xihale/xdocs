@@ -4,6 +4,7 @@ import jakarta.servlet.ServletException;
 import jakarta.servlet.annotation.WebServlet;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
+import top.xihale.xdocs.constant.ResponseCode;
 import top.xihale.xdocs.util.ResponseUtils;
 
 import java.io.IOException;
@@ -73,7 +74,7 @@ public final class RouteRegistry {
         RouteKey routeKey = RouteKey.of(routeMethod, req.getPathInfo());
         RouteHandler handler = routes.get(routeKey);
         if (handler == null) {
-            ResponseUtils.of(resp).notFound();
+            ResponseUtils.writeError(resp, ResponseCode.NOT_FOUND);
             return;
         }
         handler.invoke(target, routeKey, req, resp);

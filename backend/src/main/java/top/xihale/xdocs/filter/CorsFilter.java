@@ -29,24 +29,23 @@ public class CorsFilter implements Filter {
             return;
         }
 
-        var res = ResponseUtils.of(resp);
         String origin = req.getHeader("Origin");
 
         if (origin != null && WebConfig.isAllowedOrigin(origin)) {
-            res.header("Access-Control-Allow-Origin", origin)
-                    .header("Vary", "Origin")
-                    .header("Access-Control-Allow-Methods", WebConfig.getAllowedMethods())
-                    .header("Access-Control-Allow-Headers", WebConfig.getAllowedHeaders())
-                    .header("Access-Control-Allow-Credentials", String.valueOf(WebConfig.isAllowCredentials()))
-                    .header("Access-Control-Max-Age", "3600");
+            resp.setHeader("Access-Control-Allow-Origin", origin);
+            resp.setHeader("Vary", "Origin");
+            resp.setHeader("Access-Control-Allow-Methods", WebConfig.getAllowedMethods());
+            resp.setHeader("Access-Control-Allow-Headers", WebConfig.getAllowedHeaders());
+            resp.setHeader("Access-Control-Allow-Credentials", String.valueOf(WebConfig.isAllowCredentials()));
+            resp.setHeader("Access-Control-Max-Age", "3600");
         }
 
         if ("OPTIONS".equalsIgnoreCase(req.getMethod())) {
             if (origin != null && !WebConfig.isAllowedOrigin(origin)) {
-                res.sendStatus(ResponseCode.FORBIDDEN);
+                resp.setStatus(ResponseCode.FORBIDDEN.getCode());
                 return;
             }
-            res.sendStatus(ResponseCode.SUCCESS);
+            resp.setStatus(ResponseCode.SUCCESS.getCode());
             return;
         }
 

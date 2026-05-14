@@ -22,7 +22,6 @@ public class CsrfFilter implements Filter {
     public void doFilter(ServletRequest request, ServletResponse response, FilterChain chain) throws IOException, ServletException {
         HttpServletRequest req = (HttpServletRequest) request;
         HttpServletResponse resp = (HttpServletResponse) response;
-        var res = ResponseUtils.of(resp);
 
         // WebSocket 升级请求不走 CSRF 校验（WS 自有 Origin 检查）
         if ("websocket".equalsIgnoreCase(req.getHeader("Upgrade"))) {
@@ -36,7 +35,7 @@ public class CsrfFilter implements Filter {
         }
 
         if (!isTrustedRequest(req)) {
-            res.error(ResponseCode.FORBIDDEN, "非法跨站请求");
+            ResponseUtils.writeError(resp, ResponseCode.FORBIDDEN, "非法跨站请求");
             return;
         }
 

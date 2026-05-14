@@ -2,13 +2,14 @@ package top.xihale.xdocs.servlet;
 
 import jakarta.servlet.annotation.WebServlet;
 import jakarta.servlet.http.HttpServletRequest;
+import jakarta.servlet.http.HttpServletResponse;
 import jakarta.servlet.http.Part;
 import top.xihale.xdocs.config.StorageConfig;
 import top.xihale.xdocs.exception.ParamException;
 import top.xihale.xdocs.exception.ParamException.ParamError;
 import top.xihale.xdocs.service.UploadService;
 import top.xihale.xdocs.servlet.route.Post;
-import top.xihale.xdocs.util.ResponseUtils;
+import top.xihale.xdocs.util.Result;
 
 import java.io.IOException;
 import java.io.InputStream;
@@ -28,7 +29,7 @@ import java.util.UUID;
 public class UploadServlet extends BaseServlet {
 
     @Post("/image")
-    private void handleUploadImage(HttpServletRequest req, ResponseUtils.HttpResponse res) throws IOException, jakarta.servlet.ServletException {
+    private Result<?> handleUploadImage(HttpServletRequest req, HttpServletResponse resp) throws IOException, jakarta.servlet.ServletException {
         int userId = getRequiredUserId(req);
         Part filePart = req.getPart("file");
         if (filePart == null) {
@@ -41,11 +42,11 @@ public class UploadServlet extends BaseServlet {
         Map<String, Object> data = new HashMap<>();
         data.put("url", fileUrl);
         data.put("fileName", filePart.getSubmittedFileName());
-        res.ok(data);
+        return Result.success(data);
     }
 
     @Post("/avatar")
-    private void handleUploadAvatar(HttpServletRequest req, ResponseUtils.HttpResponse res) throws IOException, jakarta.servlet.ServletException {
+    private Result<?> handleUploadAvatar(HttpServletRequest req, HttpServletResponse resp) throws IOException, jakarta.servlet.ServletException {
         int userId = getRequiredUserId(req);
         Part filePart = req.getPart("file");
         if (filePart == null) {
@@ -60,7 +61,7 @@ public class UploadServlet extends BaseServlet {
 
         Map<String, Object> data = new HashMap<>();
         data.put("url", fileUrl);
-        res.ok(data);
+        return Result.success(data);
     }
 
     private String saveFile(Part filePart, String bizType) throws IOException {

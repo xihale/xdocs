@@ -33,16 +33,15 @@ public class ExceptionFilter implements Filter {
             return;
         }
 
-        var res = ResponseUtils.of(resp);
         try {
             chain.doFilter(request, response);
         } catch (BusinessException e) {
             int code = e.getCode();
             logBusinessException(req, code, e);
-            res.error(code, e.getMessage());
+            ResponseUtils.writeError(resp, code, e.getMessage());
         } catch (Exception e) {
             logUnhandledException(req, e);
-            res.error(ResponseCode.SERVER_ERROR);
+            ResponseUtils.writeError(resp, ResponseCode.SERVER_ERROR);
         }
     }
 

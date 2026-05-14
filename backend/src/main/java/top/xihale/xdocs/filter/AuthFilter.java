@@ -58,8 +58,7 @@ public class AuthFilter implements Filter {
         if ("websocket".equalsIgnoreCase(req.getHeader("Upgrade"))) {
             AuthState authState = resolveAuthState(req);
             if (authState.userId() == null || authState.banned()) {
-                var res = ResponseUtils.of(resp);
-                res.error(ResponseCode.UNAUTHORIZED);
+                ResponseUtils.writeError(resp, ResponseCode.UNAUTHORIZED);
                 return;
             }
             // 将 userId 注入 request attribute，供 @OnOpen 读取
@@ -69,7 +68,6 @@ public class AuthFilter implements Filter {
             return;
         }
 
-        var res = ResponseUtils.of(resp);
         String requestPath = getRequestPath(req);
         boolean whitelisted = isWhitelisted(requestPath);
         AuthState authState = resolveAuthState(req);
@@ -86,12 +84,12 @@ public class AuthFilter implements Filter {
         }
 
         if (authState.banned() && !whitelisted) {
-            res.error(ResponseCode.FORBIDDEN, "账号已被封禁");
+            ResponseUtils.writeError(resp, ResponseCode.FORBIDDEN, "账号已被封禁");
             return;
         }
 
         if (authState.userId() == null && !whitelisted) {
-            res.error(ResponseCode.UNAUTHORIZED);
+            ResponseUtils.writeError(resp, ResponseCode.UNAUTHORIZED);
             return;
         }
 

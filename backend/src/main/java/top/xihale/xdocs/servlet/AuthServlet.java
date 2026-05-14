@@ -15,10 +15,9 @@ import top.xihale.xdocs.servlet.route.Post;
 import top.xihale.xdocs.servlet.route.Public;
 import top.xihale.xdocs.util.EmailUtils;
 import top.xihale.xdocs.util.JwtUtil;
-import top.xihale.xdocs.util.ResponseUtils;
+import top.xihale.xdocs.util.Result;
 import top.xihale.xdocs.util.TurnstileUtils;
 
-import java.io.IOException;
 import java.security.SecureRandom;
 import java.time.Instant;
 import java.util.Map;
@@ -77,7 +76,7 @@ public class AuthServlet extends BaseServlet {
 
     @Public
     @Post("/register")
-    private void handleRegister(HttpServletRequest req, ResponseUtils.HttpResponse res) throws IOException {
+    private Result<?> handleRegister(HttpServletRequest req, HttpServletResponse resp) {
         checkIpRateLimit(req, "register");
         String username = requiredParam(req, "username");
         String password = requiredParam(req, "password");
@@ -106,13 +105,13 @@ public class AuthServlet extends BaseServlet {
         codeCheckAttemptsMap.remove(attemptKey);
 
         User user = UserService.register(username, password, email, nickname);
-        setTokenCookie(res.getRawResponse(), user.getId());
-        res.ok(user.toVO());
+        setTokenCookie(resp, user.getId());
+        return Result.success(user.toVO());
     }
 
     @Public
     @Post("/login")
-    private void handleLogin(HttpServletRequest req, ResponseUtils.HttpResponse res) throws IOException {
+    private Result<?> handleLogin(HttpServletRequest req, HttpServletResponse resp) {
         checkIpRateLimit(req, "login");
         String username = requiredParam(req, "username");
         checkAccountRateLimit("login:" + username.toLowerCase());
@@ -125,31 +124,30 @@ public class AuthServlet extends BaseServlet {
         }
 
         User user = UserService.login(username, password);
-        setTokenCookie(res.getRawResponse(), user.getId());
-        res.ok(user.toVO());
+        setTokenCookie(resp, user.getId());
+        return Result.success(user.toVO());
     }
 
     @Public
     @Post("/logout")
-    private void handleLogout(HttpServletRequest req, ResponseUtils.HttpResponse res) throws IOException {
-        clearTokenCookie(res.getRawResponse());
-        res.ok();
+    private Result<?> handleLogout(HttpServletRequest req, HttpServletResponse resp) {
+        clearTokenCookie(resp);
+        return Result.success();
     }
 
     @Public
     @Get("/current")
-    private void handleCurrent(HttpServletRequest req, ResponseUtils.HttpResponse res) throws IOException {
+    private Result<?> handleCurrent(HttpServletRequest req, HttpServletResponse resp) {
         User user = getOptionalCurrentUser(req);
         if (user == null) {
-            res.ok(null);
-            return;
+            return Result.success(null);
         }
-        res.ok(user.toVO());
+        return Result.success(user.toVO());
     }
 
     @Public
     @Post("/send-code")
-    private void handleSendEmailCode(HttpServletRequest req, ResponseUtils.HttpResponse res) throws IOException {
+    private Result<?> handleSendEmailCode(HttpServletRequest req, HttpServletResponse resp) {
         // 人机验证：Turnstile
         String turnstileToken = requiredParam(req, "turnstileToken");
         if (!TurnstileUtils.verify(turnstileToken)) {
@@ -185,12 +183,12 @@ public class AuthServlet extends BaseServlet {
 
         EmailUtils.sendCode(email, code);
         emailCodeLastSentAtMap.put(rateLimitKey, now);
-        res.ok("验证码已发送");
+        return Result.success("验证码已发送");
     }
 
     @Public
     @Post("/reset-password")
-    private void handleResetPassword(HttpServletRequest req, ResponseUtils.HttpResponse res) throws IOException {
+    private Result<?> handleResetPassword(HttpServletRequest req, HttpServletResponse resp) {
         checkIpRateLimit(req, "reset-password");
         String email = requiredParam(req, "email");
         checkAccountRateLimit("reset-password:" + email.toLowerCase());
@@ -215,7 +213,7 @@ public class AuthServlet extends BaseServlet {
         codeCheckAttemptsMap.remove(attemptKey);
 
         UserService.resetPassword(email, newPassword);
-        res.ok("密码已重置");
+        return Result.success("密码已重置");
     }
 
     /**

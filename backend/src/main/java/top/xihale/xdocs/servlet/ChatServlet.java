@@ -2,12 +2,12 @@ package top.xihale.xdocs.servlet;
 
 import jakarta.servlet.annotation.WebServlet;
 import jakarta.servlet.http.HttpServletRequest;
+import jakarta.servlet.http.HttpServletResponse;
 import top.xihale.xdocs.service.ChatService;
 import top.xihale.xdocs.servlet.route.Get;
-import top.xihale.xdocs.util.ResponseUtils;
+import top.xihale.xdocs.util.Result;
 import top.xihale.xdocs.websocket.ChatWebSocket;
 
-import java.io.IOException;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
@@ -19,16 +19,16 @@ import java.util.Map;
 public class ChatServlet extends BaseServlet {
 
     @Get("/history")
-    private void handleHistory(HttpServletRequest req, ResponseUtils.HttpResponse res) throws IOException {
+    private Result<?> handleHistory(HttpServletRequest req, HttpServletResponse resp) {
         getRequiredUserId(req);
         int articleId = requiredIntParam(req, "articleId");
         int limit = optionalIntParamOrDefault(req, "limit", 50);
 
-        res.ok(ChatService.getHistoryWithVO(articleId, limit));
+        return Result.success(ChatService.getHistoryWithVO(articleId, limit));
     }
 
     @Get("/online-members")
-    private void handleOnlineMembers(HttpServletRequest req, ResponseUtils.HttpResponse res) throws IOException {
+    private Result<?> handleOnlineMembers(HttpServletRequest req, HttpServletResponse resp) {
         getRequiredUserId(req);
         String articleId = requiredParam(req, "articleId");
         var users = ChatWebSocket.getOnlineUsers(articleId);
@@ -40,7 +40,7 @@ public class ChatServlet extends BaseServlet {
             vo.put("avatarUrl", u.avatarUrl());
             voList.add(vo);
         }
-        res.ok(voList);
+        return Result.success(voList);
     }
 
 }

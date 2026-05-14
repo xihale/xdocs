@@ -15,81 +15,40 @@ public final class ResponseUtils {
     private ResponseUtils() {
     }
 
-    public static HttpResponse of(HttpServletResponse resp) {
-        return new HttpResponse(resp);
-    }
-
-    private static void writeJson(HttpServletResponse resp, int status, Object body) throws IOException {
-        if (resp.isCommitted()) {
-            return;
-        }
-        resp.resetBuffer();
-        resp.setStatus(status);
+    /**
+     * 将 Result 写入 HttpServletResponse（框架内部使用，保证只写一次）
+     */
+    public static void writeResult(HttpServletResponse resp, Result<?> result) throws IOException {
+        resp.setStatus(result.getCode());
         resp.setContentType(JSON_CONTENT_TYPE);
-        resp.getWriter().write(JsonUtils.toJson(body));
+        resp.getWriter().write(JsonUtils.toJson(result));
     }
 
     /**
-     * HTTP 响应封装，提供链式调用
+     * 写入错误响应（ExceptionFilter 等使用）
      */
-    public static final class HttpResponse {
+    public static void writeError(HttpServletResponse resp, int code, String message) throws IOException {
+        writeResult(resp, Result.error(code, message));
+    }
 
-        private final HttpServletResponse resp;
+    /**
+     * 写入错误响应（ExceptionFilter 等使用）
+     */
+    public static void writeError(HttpServletResponse resp, ResponseCode responseCode) throws IOException {
+        writeResult(resp, Result.error(responseCode));
+    }
 
-        public HttpResponse(HttpServletResponse resp) {
-            this.resp = resp;
-        }
+    /**
+     * 写入错误响应（ExceptionFilter 等使用）
+     */
+    public static void writeError(HttpServletResponse resp, ResponseCode responseCode, String message) throws IOException {
+        writeResult(resp, Result.error(responseCode.getCode(), message));
+    }
 
-        public HttpServletResponse getRawResponse() {
-            return resp;
-        }
-
-        public void ok(Object data) throws IOException {
-            writeJson(resp, ResponseCode.SUCCESS.getCode(), Result.success(data));
-        }
-
-        public void ok() throws IOException {
-            writeJson(resp, ResponseCode.SUCCESS.getCode(), Result.success());
-        }
-
-        public void notFound() throws IOException {
-            error(ResponseCode.NOT_FOUND);
-        }
-
-        public HttpResponse header(String name, String value) {
-            if (resp.isCommitted()) {
-                return this;
-            }
-            resp.setHeader(name, value);
-            return this;
-        }
-
-        public void sendStatus(int code) {
-            if (resp.isCommitted()) {
-                return;
-            }
-            resp.resetBuffer();
-            resp.setStatus(code);
-        }
-
-        public void sendStatus(ResponseCode responseCode) {
-            sendStatus(responseCode.getCode());
-        }
-
-        public void error(int code) throws IOException {
-            writeJson(resp, code, Result.error(code));
-        }
-
-        public void error(ResponseCode responseCode) throws IOException {
-            error(responseCode.getCode());
-        }
-
-        public void error(int code, String message) throws IOException {
-            writeJson(resp, code, Result.error(code, message));
-        }
-
-        public void error(ResponseCode responseCode, String message) throws IOException {
-            error(responseCode.getCode(), message);
-        }
+    /**
+     * 写入错误响应（ExceptionFilter 等使用）
+     */
+    public static void writeError(HttpServletResponse resp, int code) throws IOException {
+        writeResult(resp, Result.error(code));
     }
 }

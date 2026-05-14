@@ -2,6 +2,7 @@ package top.xihale.xdocs.servlet;
 
 import jakarta.servlet.annotation.WebServlet;
 import jakarta.servlet.http.HttpServletRequest;
+import jakarta.servlet.http.HttpServletResponse;
 import top.xihale.xdocs.po.Article;
 import top.xihale.xdocs.service.ArticleService;
 import top.xihale.xdocs.servlet.route.Delete;
@@ -10,10 +11,9 @@ import top.xihale.xdocs.servlet.route.Post;
 import top.xihale.xdocs.servlet.route.Public;
 import top.xihale.xdocs.servlet.route.Put;
 import top.xihale.xdocs.util.HtmlSanitizer;
-import top.xihale.xdocs.util.ResponseUtils;
+import top.xihale.xdocs.util.Result;
 import top.xihale.xdocs.vo.ArticleVO;
 
-import java.io.IOException;
 import java.util.*;
 
 /**
@@ -23,7 +23,7 @@ import java.util.*;
 public class ArticleServlet extends BaseServlet {
 
     @Post("/create")
-    private void handleCreate(HttpServletRequest req, ResponseUtils.HttpResponse res) throws IOException {
+    private Result<?> handleCreate(HttpServletRequest req, HttpServletResponse resp) {
         int userId = getRequiredUserId(req);
         int kbId = requiredIntParam(req, "kbId");
         String title = requiredParam(req, "title");
@@ -31,11 +31,11 @@ public class ArticleServlet extends BaseServlet {
         if (content != null) content = HtmlSanitizer.sanitizeArticleContent(content);
 
         var article = ArticleService.createArticle(kbId, title, content, userId);
-        res.ok(ArticleService.toVO(article, userId));
+        return Result.success(ArticleService.toVO(article, userId));
     }
 
     @Put("/update")
-    private void handleUpdate(HttpServletRequest req, ResponseUtils.HttpResponse res) throws IOException {
+    private Result<?> handleUpdate(HttpServletRequest req, HttpServletResponse resp) {
         int userId = getRequiredUserId(req);
         int articleId = requiredIntParam(req, "id");
         String title = optionalParam(req, "title");
@@ -46,38 +46,38 @@ public class ArticleServlet extends BaseServlet {
 
         ArticleService.updateArticle(articleId, title, content, summary, status, userId);
         var article = ArticleService.findArticleById(articleId);
-        res.ok(ArticleService.toVO(article, userId));
+        return Result.success(ArticleService.toVO(article, userId));
     }
 
     @Delete("/delete")
-    private void handleDelete(HttpServletRequest req, ResponseUtils.HttpResponse res) throws IOException {
+    private Result<?> handleDelete(HttpServletRequest req, HttpServletResponse resp) {
         int userId = getRequiredUserId(req);
         int articleId = requiredIntParam(req, "id");
         ArticleService.deleteArticle(articleId, userId);
-        res.ok();
+        return Result.success();
     }
 
     @Public
     @Get("/detail")
-    private void handleDetail(HttpServletRequest req, ResponseUtils.HttpResponse res) throws IOException {
+    private Result<?> handleDetail(HttpServletRequest req, HttpServletResponse resp) {
         int articleId = requiredIntParam(req, "id");
         var article = ArticleService.findArticleById(articleId);
         Integer userId = getOptionalUserId(req);
-        res.ok(ArticleService.toVO(article, userId));
+        return Result.success(ArticleService.toVO(article, userId));
     }
 
     @Get("/list")
-    private void handleListByKb(HttpServletRequest req, ResponseUtils.HttpResponse res) throws IOException {
+    private Result<?> handleListByKb(HttpServletRequest req, HttpServletResponse resp) {
         int kbId = requiredIntParam(req, "kbId");
         Integer userId = getOptionalUserId(req);
         var articles = ArticleService.findByKnowledgeBase(kbId);
         var voList = articles.stream().map(a -> ArticleService.toVO(a, userId)).toList();
-        res.ok(voList);
+        return Result.success(voList);
     }
 
     @Public
     @Get("/public-list")
-    private void handlePublicList(HttpServletRequest req, ResponseUtils.HttpResponse res) throws IOException {
+    private Result<?> handlePublicList(HttpServletRequest req, HttpServletResponse resp) {
         int offset = optionalIntParamOrDefault(req, "offset", 0);
         int limit = optionalIntParamOrDefault(req, "limit", 20);
         String sort = optionalParamOrDefault(req, "sort", "time"); // time | likes
@@ -101,40 +101,40 @@ public class ArticleServlet extends BaseServlet {
             }
             return vo;
         }).toList();
-        res.ok(voList);
+        return Result.success(voList);
     }
 
     @Post("/save")
-    private void handleSave(HttpServletRequest req, ResponseUtils.HttpResponse res) throws IOException {
+    private Result<?> handleSave(HttpServletRequest req, HttpServletResponse resp) {
         int userId = getRequiredUserId(req);
         int articleId = requiredIntParam(req, "id");
         String content = optionalParam(req, "content");
         if (content != null) content = HtmlSanitizer.sanitizeArticleContent(content);
 
         var article = ArticleService.saveArticle(articleId, content, userId);
-        res.ok(ArticleService.toVO(article, userId));
+        return Result.success(ArticleService.toVO(article, userId));
     }
 
     // ==================== 点赞 ====================
 
     @Post("/like")
-    private void handleLike(HttpServletRequest req, ResponseUtils.HttpResponse res) throws IOException {
+    private Result<?> handleLike(HttpServletRequest req, HttpServletResponse resp) {
         int userId = getRequiredUserId(req);
         int articleId = requiredIntParam(req, "articleId");
-        res.ok(ArticleService.likeArticle(articleId, userId));
+        return Result.success(ArticleService.likeArticle(articleId, userId));
     }
 
     @Post("/unlike")
-    private void handleUnlike(HttpServletRequest req, ResponseUtils.HttpResponse res) throws IOException {
+    private Result<?> handleUnlike(HttpServletRequest req, HttpServletResponse resp) {
         int userId = getRequiredUserId(req);
         int articleId = requiredIntParam(req, "articleId");
-        res.ok(ArticleService.unlikeArticle(articleId, userId));
+        return Result.success(ArticleService.unlikeArticle(articleId, userId));
     }
 
     // ==================== 评论 ====================
 
     @Post("/comment")
-    private void handleAddComment(HttpServletRequest req, ResponseUtils.HttpResponse res) throws IOException {
+    private Result<?> handleAddComment(HttpServletRequest req, HttpServletResponse resp) {
         int userId = getRequiredUserId(req);
         int articleId = requiredIntParam(req, "articleId");
         String content = requiredParam(req, "content");
@@ -143,49 +143,49 @@ public class ArticleServlet extends BaseServlet {
         Integer replyToId = optionalIntParam(req, "replyToId");
 
         int commentId = ArticleService.addComment(articleId, userId, content, parentId, replyToId);
-        res.ok(Map.of("id", commentId));
+        return Result.success(Map.of("id", commentId));
     }
 
     @Public
     @Get("/comments")
-    private void handleListComments(HttpServletRequest req, ResponseUtils.HttpResponse res) throws IOException {
+    private Result<?> handleListComments(HttpServletRequest req, HttpServletResponse resp) {
         int articleId = requiredIntParam(req, "articleId");
-        res.ok(ArticleService.listComments(articleId));
+        return Result.success(ArticleService.listComments(articleId));
     }
 
     @Delete("/comment-delete")
-    private void handleDeleteComment(HttpServletRequest req, ResponseUtils.HttpResponse res) throws IOException {
+    private Result<?> handleDeleteComment(HttpServletRequest req, HttpServletResponse resp) {
         int userId = getRequiredUserId(req);
         int commentId = requiredIntParam(req, "id");
         ArticleService.deleteComment(commentId, userId);
-        res.ok();
+        return Result.success();
     }
 
     // ==================== 收藏 ====================
 
     @Post("/favorite")
-    private void handleFavorite(HttpServletRequest req, ResponseUtils.HttpResponse res) throws IOException {
+    private Result<?> handleFavorite(HttpServletRequest req, HttpServletResponse resp) {
         int userId = getRequiredUserId(req);
         int articleId = requiredIntParam(req, "articleId");
         ArticleService.favoriteArticle(userId, articleId);
-        res.ok(Map.of("favorited", true));
+        return Result.success(Map.of("favorited", true));
     }
 
     @Post("/unfavorite")
-    private void handleUnfavorite(HttpServletRequest req, ResponseUtils.HttpResponse res) throws IOException {
+    private Result<?> handleUnfavorite(HttpServletRequest req, HttpServletResponse resp) {
         int userId = getRequiredUserId(req);
         int articleId = requiredIntParam(req, "articleId");
         ArticleService.unfavoriteArticle(userId, articleId);
-        res.ok(Map.of("favorited", false));
+        return Result.success(Map.of("favorited", false));
     }
 
     // ==================== 浏览记录 ====================
 
     @Post("/visit")
-    private void handleVisit(HttpServletRequest req, ResponseUtils.HttpResponse res) throws IOException {
+    private Result<?> handleVisit(HttpServletRequest req, HttpServletResponse resp) {
         int userId = getRequiredUserId(req);
         int articleId = requiredIntParam(req, "articleId");
         ArticleService.recordVisit(userId, articleId);
-        res.ok();
+        return Result.success();
     }
 }
