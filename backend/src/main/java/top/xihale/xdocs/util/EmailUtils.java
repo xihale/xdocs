@@ -18,6 +18,30 @@ import java.util.logging.Logger;
  */
 public class EmailUtils {
     private static final Logger LOGGER = Logger.getLogger(EmailUtils.class.getName());
+
+    private static final Properties SMTP_PROPS = new Properties();
+    private static final Session SMTP_SESSION;
+
+    static {
+        SMTP_PROPS.put("mail.smtp.host", WebConfig.getMailSmtpHost());
+        SMTP_PROPS.put("mail.smtp.port", String.valueOf(WebConfig.getMailSmtpPort()));
+        SMTP_PROPS.put("mail.smtp.auth", "true");
+        SMTP_PROPS.put("mail.smtp.connectiontimeout", "10000");
+        SMTP_PROPS.put("mail.smtp.timeout", "10000");
+        SMTP_PROPS.put("mail.smtp.writetimeout", "10000");
+        if (WebConfig.isMailSslEnable()) {
+            SMTP_PROPS.put("mail.smtp.ssl.enable", "true");
+            SMTP_PROPS.put("mail.smtp.socketFactory.class", "javax.net.ssl.SSLSocketFactory");
+        }
+
+        SMTP_SESSION = Session.getInstance(SMTP_PROPS, new Authenticator() {
+            @Override
+            protected PasswordAuthentication getPasswordAuthentication() {
+                return new PasswordAuthentication(WebConfig.getMailSmtpUsername(), WebConfig.getMailSmtpPassword());
+            }
+        });
+    }
+
     private static final ExecutorService executor = Executors.newFixedThreadPool(2, new ThreadFactory() {
         private final AtomicInteger counter = new AtomicInteger(0);
         @Override
@@ -34,7 +58,7 @@ public class EmailUtils {
         sendEmailAsync(toEmail, subject, content);
     }
 
-    public static void sendEmailAsync(String to, String subject, String content) {
+    private static void sendEmailAsync(String to, String subject, String content) {
         executor.submit(() -> {
             try {
                 sendEmail(to, subject, content);
@@ -44,24 +68,8 @@ public class EmailUtils {
         });
     }
 
-    public static void sendEmail(String to, String subject, String content) throws MessagingException {
-        Properties props = new Properties();
-        props.put("mail.smtp.host", WebConfig.getMailSmtpHost());
-        props.put("mail.smtp.port", String.valueOf(WebConfig.getMailSmtpPort()));
-        props.put("mail.smtp.auth", "true");
-        if (WebConfig.isMailSslEnable()) {
-            props.put("mail.smtp.ssl.enable", "true");
-            props.put("mail.smtp.socketFactory.class", "javax.net.ssl.SSLSocketFactory");
-        }
-
-        Session session = Session.getInstance(props, new Authenticator() {
-            @Override
-            protected PasswordAuthentication getPasswordAuthentication() {
-                return new PasswordAuthentication(WebConfig.getMailSmtpUsername(), WebConfig.getMailSmtpPassword());
-            }
-        });
-
-        Message message = new MimeMessage(session);
+    private static void sendEmail(String to, String subject, String content) throws MessagingException {
+        Message message = new MimeMessage(SMTP_SESSION);
         message.setFrom(new InternetAddress(WebConfig.getMailFrom()));
         message.setRecipients(Message.RecipientType.TO, InternetAddress.parse(to));
         message.setSubject(subject);

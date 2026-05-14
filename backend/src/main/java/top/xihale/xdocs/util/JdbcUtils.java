@@ -108,14 +108,14 @@ public class JdbcUtils {
     /**
      * 开启事务
      */
-    public static void beginTransaction(Connection conn) throws SQLException {
+    static void beginTransaction(Connection conn) throws SQLException {
         conn.setAutoCommit(false);
     }
 
     /**
      * 提交事务
      */
-    public static void commit(Connection conn) throws SQLException {
+    static void commit(Connection conn) throws SQLException {
         conn.commit();
         conn.setAutoCommit(true);
     }
@@ -123,7 +123,7 @@ public class JdbcUtils {
     /**
      * 回滚事务
      */
-    public static void rollback(Connection conn) {
+    static void rollback(Connection conn) {
         try {
             conn.rollback();
             conn.setAutoCommit(true);
