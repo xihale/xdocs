@@ -29,7 +29,8 @@ public class JsonUtils {
         return GSON.toJson(obj);
     }
 
-    public static <T> T fromJson(String json, Class<T> clazz) {
+    public static <R> R fromJson(String json, Class<R> clazz) {
+
         return GSON.fromJson(json, clazz);
     }
 

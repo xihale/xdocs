@@ -104,7 +104,8 @@ public class SqlBuilder {
      * @param mapper 行映射器
      * @return 结果列表
      */
-    public <T> List<T> queryList(RowMapper<T> mapper) {
+    public <R> List<R> queryList(RowMapper<R> mapper) {
+
         Connection conn = null;
         PreparedStatement ps = null;
         ResultSet rs = null;
@@ -113,7 +114,8 @@ public class SqlBuilder {
             ps = conn.prepareStatement(sql);
             bindParams(ps);
             rs = ps.executeQuery();
-            List<T> result = new ArrayList<>();
+            List<R> result = new ArrayList<>();
+
             while (rs.next()) {
                 result.add(mapper.mapRow(rs));
             }
@@ -131,7 +133,8 @@ public class SqlBuilder {
      * @param mapper 行映射器
      * @return Optional 包装的结果
      */
-    public <T> Optional<T> queryOne(RowMapper<T> mapper) {
+    public <R> Optional<R> queryOne(RowMapper<R> mapper) {
+
         Connection conn = null;
         PreparedStatement ps = null;
         ResultSet rs = null;
@@ -154,11 +157,12 @@ public class SqlBuilder {
     /**
      * 查询返回单个值（如 COUNT、SUM 等）
      *
-     * @param <T> 返回值类型
+     * @param <R> 返回值类型
      * @return 查询结果
      */
     @SuppressWarnings("unchecked")
-    public <T> T queryScalar() {
+    public <R> R queryScalar() {
+
         Connection conn = null;
         PreparedStatement ps = null;
         ResultSet rs = null;
@@ -168,7 +172,8 @@ public class SqlBuilder {
             bindParams(ps);
             rs = ps.executeQuery();
             if (rs.next()) {
-                return (T) rs.getObject(1);
+                return (R) rs.getObject(1);
+
             }
             return null;
         } catch (SQLException e) {
@@ -312,13 +317,14 @@ public class SqlBuilder {
      * @param <T>    返回类型
      * @return 操作结果
      */
-    public static <T> T inTransaction(TransactionAction<T> action) {
+    public static <R> R inTransaction(TransactionAction<R> action) {
+
         Connection conn = null;
         try {
             conn = JdbcUtils.getConnection();
             JdbcUtils.beginTransaction(conn);
             JdbcUtils.bindTransactionConnection(conn);
-            T result = action.execute(conn);
+            R result = action.execute(conn);
             JdbcUtils.commit(conn);
             return result;
         } catch (Exception e) {
@@ -353,10 +359,14 @@ public class SqlBuilder {
     /**
      * 事务操作函数式接口
      *
-     * @param <T> 返回类型
+     * @param <R> 返回类型
+
      */
     @FunctionalInterface
-    public interface TransactionAction<T> {
-        T execute(Connection conn) throws Exception;
+    public interface TransactionAction<R> {
+
+
+        R execute(Connection conn) throws Exception;
+
     }
 }

@@ -18,11 +18,12 @@ import java.sql.SQLException;
  * };
  * </pre>
  *
- * @param <T> 映射目标类型
+ * @param <R> 映射目标类型
  * @see SqlBuilder
  */
 @FunctionalInterface
-public interface RowMapper<T> {
+public interface RowMapper<R> {
+
 
     /**
      * 将 ResultSet 当前行映射为目标对象
@@ -33,5 +34,6 @@ public interface RowMapper<T> {
      * @return 映射后的对象
      * @throws SQLException 数据库异常
      */
-    T mapRow(ResultSet rs) throws SQLException;
+    R mapRow(ResultSet rs) throws SQLException;
+
 }

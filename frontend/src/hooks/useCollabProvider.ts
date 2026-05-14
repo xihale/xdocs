@@ -79,12 +79,12 @@ export function useCollabProvider(
 
   // ---- Yjs Doc + Awareness lifecycle (tied to documentId) ----
   useEffect(() => {
-    const doc = new Y.Doc();
-    const awareness = new Awareness(doc);
-    yDocRef.current = doc;
-    awarenessRef.current = awareness;
-    setYDoc(doc);
-    setAwareness(awareness);
+    const yDocInstance = new Y.Doc();
+    const awarenessInstance = new Awareness(yDocInstance);
+    yDocRef.current = yDocInstance;
+    awarenessRef.current = awarenessInstance;
+    setYDoc(yDocInstance);
+    setAwareness(awarenessInstance);
 
     return () => {
       if (retryTimerRef.current !== null) {
@@ -94,10 +94,10 @@ export function useCollabProvider(
       providerRef.current?.destroy();
       providerRef.current = null;
       setProvider(null);
-      awareness.destroy();
+      awarenessInstance.destroy();
       awarenessRef.current = null;
       setAwareness(null);
-      doc.destroy();
+      yDocInstance.destroy();
       yDocRef.current = null;
       setYDoc(null);
     };
@@ -105,9 +105,9 @@ export function useCollabProvider(
 
   // ---- WebSocket connection (tied to documentId) ----
   useEffect(() => {
-    const doc = yDocRef.current;
-    const awareness = awarenessRef.current;
-    if (!doc || !awareness) return;
+    const yDocInstance = yDocRef.current;
+    const awarenessInstance = awarenessRef.current;
+    if (!yDocInstance || !awarenessInstance) return;
 
     let cancelled = false;
     const connectionId = ++connectionIdRef.current;
@@ -121,8 +121,8 @@ export function useCollabProvider(
     };
 
     const emitUsers = () => {
-      if (!awareness) return;
-      setUsers(buildCollabUsers(awareness, usernameRef.current));
+      if (!awarenessInstance) return;
+      setUsers(buildCollabUsers(awarenessInstance, usernameRef.current));
     };
 
     const scheduleReconnect = () => {
@@ -148,9 +148,10 @@ export function useCollabProvider(
       const provider = new WebsocketProvider(
         `${protocol}//${host}/api/collaboration`,
         documentId,
-        doc,
-        { awareness, connect: true },
+        yDocInstance,
+        { awareness: awarenessInstance, connect: true },
       );
+
 
       if (!isCurrentConnection()) {
         provider.destroy();
@@ -162,7 +163,8 @@ export function useCollabProvider(
 
       // Set local awareness state
       const color = pickColor(usernameRef.current);
-      awareness.setLocalStateField("user", { name: usernameRef.current, color });
+      awarenessInstance.setLocalStateField("user", { name: usernameRef.current, color });
+
       emitUsers();
 
       provider.on("status", ({ status: s }: { status: string }) => {
@@ -197,7 +199,8 @@ export function useCollabProvider(
       cancelled = true;
       connectionIdRef.current++;
       clearRetryTimer();
-      awareness.setLocalState(null);
+      awarenessInstance.setLocalState(null);
+
       emitUsers();
       providerRef.current?.destroy();
       providerRef.current = null;

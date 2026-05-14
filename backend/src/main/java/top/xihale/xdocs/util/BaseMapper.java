@@ -37,28 +37,33 @@ import java.util.stream.Collectors;
  * ArticleDao.INSTANCE.findById(1);
  * </pre>
  *
- * @param <T> 实体类型
+ * @param <E> 实体类型
  */
-public abstract class BaseMapper<T> {
+public abstract class BaseMapper<E> {
+
 
     private static final ConcurrentHashMap<Class<?>, EntityMeta> META_CACHE = new ConcurrentHashMap<>();
 
     private final EntityMeta meta;
-    private final RowMapper<T> rowMapper;
+    private final RowMapper<E> rowMapper;
+
 
     protected BaseMapper() {
         @SuppressWarnings("unchecked")
-        Class<T> clazz = (Class<T>) resolveGenericType();
+        Class<E> clazz = (Class<E>) resolveGenericType();
+
         this.meta = META_CACHE.computeIfAbsent(clazz, EntityMeta::new);
         @SuppressWarnings("unchecked")
-        RowMapper<T> m = rs -> mapFromResultSet(rs);
+        RowMapper<E> m = rs -> mapFromResultSet(rs);
+
         this.rowMapper = m;
     }
 
     // ==================== CRUD ====================
 
     /** 插入实体并回填自增主键 */
-    public void insert(T entity) {
+    public void insert(E entity) {
+
         List<FieldMeta> columns = meta.nonIdColumns;
         int id = SqlBuilder.update(buildInsertSql(columns))
                 .params(extractValues(entity, columns))
@@ -67,7 +72,8 @@ public abstract class BaseMapper<T> {
     }
 
     /** 按主键更新全部非主键字段 */
-    public int update(T entity) {
+    public int update(E entity) {
+
         List<FieldMeta> columns = meta.nonIdColumns;
         return SqlBuilder.update(buildUpdateSql(columns))
                 .params(extractValues(entity, columns))
@@ -76,7 +82,8 @@ public abstract class BaseMapper<T> {
     }
 
     /** 按主键更新指定字段 */
-    public int update(T entity, String... fieldNames) {
+    public int update(E entity, String... fieldNames) {
+
         List<FieldMeta> columns = filterFieldMetas(fieldNames);
         return SqlBuilder.update(buildUpdateSql(columns))
                 .params(extractValues(entity, columns))
@@ -92,27 +99,31 @@ public abstract class BaseMapper<T> {
     }
 
     /** 按主键查单条 */
-    public Optional<T> findById(Object id) {
+    public Optional<E> findById(Object id) {
+
         return SqlBuilder.select("SELECT " + meta.allColumnsStr + " FROM " + meta.table + " WHERE " + meta.idColumn.columnName + " = ?")
                 .param(id)
                 .queryOne(rowMapper);
     }
 
     /** 查全表 */
-    public List<T> findAll() {
+    public List<E> findAll() {
+
         return SqlBuilder.select("SELECT " + meta.allColumnsStr + " FROM " + meta.table)
                 .queryList(rowMapper);
     }
 
     /** 条件查列表。例: {@code findList("status = ? AND author_id = ?", 1, userId)} */
-    public List<T> findList(String whereClause, Object... params) {
+    public List<E> findList(String whereClause, Object... params) {
+
         return SqlBuilder.select("SELECT " + meta.allColumnsStr + " FROM " + meta.table + " WHERE " + whereClause)
                 .params(params)
                 .queryList(rowMapper);
     }
 
     /** 条件查单条 */
-    public Optional<T> findOne(String whereClause, Object... params) {
+    public Optional<E> findOne(String whereClause, Object... params) {
+
         return SqlBuilder.select("SELECT " + meta.allColumnsStr + " FROM " + meta.table + " WHERE " + whereClause)
                 .params(params)
                 .queryOne(rowMapper);
@@ -135,7 +146,8 @@ public abstract class BaseMapper<T> {
     // ==================== 查询辅助 ====================
 
     /** 获取行映射器（用于自定义 SqlBuilder 查询） */
-    public RowMapper<T> mapper() {
+    public RowMapper<E> mapper() {
+
         return rowMapper;
     }
 
@@ -152,9 +164,11 @@ public abstract class BaseMapper<T> {
     // ==================== 反射映射 ====================
 
     @SuppressWarnings("unchecked")
-    private T mapFromResultSet(ResultSet rs) throws SQLException {
+    private E mapFromResultSet(ResultSet rs) throws SQLException {
+
         try {
-            T instance = (T) meta.constructor.newInstance();
+            E instance = (E) meta.constructor.newInstance();
+
             for (FieldMeta fm : meta.allColumns) {
                 fm.field.set(instance, readColumn(rs, fm));
             }
@@ -190,7 +204,8 @@ public abstract class BaseMapper<T> {
 
     // ==================== 字段值提取 ====================
 
-    private Object[] extractValues(T entity, List<FieldMeta> columns) {
+    private Object[] extractValues(E entity, List<FieldMeta> columns) {
+
         Object[] values = new Object[columns.size()];
         for (int i = 0; i < columns.size(); i++) {
             try {
@@ -202,7 +217,8 @@ public abstract class BaseMapper<T> {
         return values;
     }
 
-    private void setId(T entity, int id) {
+    private void setId(E entity, int id) {
+
         try {
             meta.idColumn.field.set(entity, id);
         } catch (IllegalAccessException e) {
@@ -210,7 +226,8 @@ public abstract class BaseMapper<T> {
         }
     }
 
-    private Object getIdValue(T entity) {
+    private Object getIdValue(E entity) {
+
         try {
             return meta.idColumn.field.get(entity);
         } catch (IllegalAccessException e) {
