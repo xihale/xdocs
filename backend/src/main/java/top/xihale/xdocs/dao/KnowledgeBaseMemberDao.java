@@ -2,7 +2,7 @@ package top.xihale.xdocs.dao;
 
 import top.xihale.xdocs.po.KnowledgeBaseMember;
 import top.xihale.xdocs.util.BaseMapper;
-import top.xihale.xdocs.util.SqlBuilder;
+import top.xihale.xdocs.util.Db;
 
 import java.util.List;
 import java.util.Optional;
@@ -10,47 +10,49 @@ import java.util.Optional;
 /**
  * 知识库成员关系数据访问层
  */
-public class KnowledgeBaseMemberDao extends BaseMapper<KnowledgeBaseMember> {
+public class KnowledgeBaseMemberDao {
 
-    public static final KnowledgeBaseMemberDao INSTANCE = new KnowledgeBaseMemberDao();
+    private static final BaseMapper<KnowledgeBaseMember> MAPPER = new BaseMapper<>(KnowledgeBaseMember.class);
 
-    public int updateRole(Integer kbId, Integer userId, int role) {
-        return SqlBuilder.update("UPDATE knowledge_base_member SET role=? WHERE knowledge_base_id=? AND user_id=?")
-                .param(role).param(kbId).param(userId)
+    public static void insert(KnowledgeBaseMember member) { MAPPER.insert(member); }
+
+    public static int updateRole(Integer kbId, Integer userId, int role) {
+        return Db.sql("UPDATE knowledge_base_member SET role = :role WHERE knowledge_base_id = :kbId AND user_id = :userId")
+                .param("role", role).param("kbId", kbId).param("userId", userId)
                 .execute();
     }
 
-    public int updateInviteStatus(Integer kbId, Integer userId, int inviteStatus) {
-        return SqlBuilder.update("UPDATE knowledge_base_member SET invite_status=? WHERE knowledge_base_id=? AND user_id=?")
-                .param(inviteStatus).param(kbId).param(userId)
+    public static int updateInviteStatus(Integer kbId, Integer userId, int inviteStatus) {
+        return Db.sql("UPDATE knowledge_base_member SET invite_status = :inviteStatus WHERE knowledge_base_id = :kbId AND user_id = :userId")
+                .param("inviteStatus", inviteStatus).param("kbId", kbId).param("userId", userId)
                 .execute();
     }
 
-    public int delete(Integer kbId, Integer userId) {
-        return SqlBuilder.update("DELETE FROM knowledge_base_member WHERE knowledge_base_id=? AND user_id=?")
-                .param(kbId).param(userId)
+    public static int delete(Integer kbId, Integer userId) {
+        return Db.sql("DELETE FROM knowledge_base_member WHERE knowledge_base_id = :kbId AND user_id = :userId")
+                .param("kbId", kbId).param("userId", userId)
                 .execute();
     }
 
-    public int deleteByKbId(Integer kbId) {
-        return SqlBuilder.update("DELETE FROM knowledge_base_member WHERE knowledge_base_id=?")
-                .param(kbId)
+    public static int deleteByKbId(Integer kbId) {
+        return Db.sql("DELETE FROM knowledge_base_member WHERE knowledge_base_id = :kbId")
+                .param("kbId", kbId)
                 .execute();
     }
 
-    public Optional<KnowledgeBaseMember> findByKbIdAndUserId(Integer kbId, Integer userId) {
-        return findOne("knowledge_base_id=? AND user_id=?", kbId, userId);
+    public static Optional<KnowledgeBaseMember> findByKbIdAndUserId(Integer kbId, Integer userId) {
+        return MAPPER.findOne("knowledge_base_id = ? AND user_id = ?", kbId, userId);
     }
 
-    public List<KnowledgeBaseMember> findByKbId(Integer kbId) {
-        return findList("knowledge_base_id=?", kbId);
+    public static List<KnowledgeBaseMember> findByKbId(Integer kbId) {
+        return MAPPER.findList("knowledge_base_id = ?", kbId);
     }
 
-    public List<KnowledgeBaseMember> findByUserId(Integer userId) {
-        return findList("user_id=?", userId);
+    public static List<KnowledgeBaseMember> findByUserId(Integer userId) {
+        return MAPPER.findList("user_id = ?", userId);
     }
 
-    public List<KnowledgeBaseMember> findPendingByUserId(Integer userId) {
-        return findList("user_id=? AND invite_status=0", userId);
+    public static List<KnowledgeBaseMember> findPendingByUserId(Integer userId) {
+        return MAPPER.findList("user_id = ? AND invite_status = 0", userId);
     }
 }

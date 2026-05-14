@@ -9,20 +9,18 @@ import lombok.Setter;
 import java.time.LocalDateTime;
 
 /**
- * 聊天消息视图对象，附带发送者信息
+ * 文章简要视图对象（收藏/浏览历史）
  */
 @Getter
 @Setter
 @Builder
 @AllArgsConstructor
 @NoArgsConstructor
-public class ChatMessageVO {
+public class CompactArticleVO {
     private Integer id;
-    private Integer articleId;
-    private Integer senderId;
-    private String senderName;
-    private String senderAvatar;
-    private int messageType;
-    private String content;
+    private String title;
+    private Integer authorId;
+    private LocalDateTime updateTime;
+    /** 收藏时额外附带文章创建时间 */
     private LocalDateTime createTime;
 }

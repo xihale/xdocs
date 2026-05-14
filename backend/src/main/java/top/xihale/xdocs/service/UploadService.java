@@ -18,7 +18,7 @@ public class UploadService {
      */
     public static UploadFile uploadFile(String bizType, Integer bizId, String fileName, String fileUrl, Long fileSize, int uploaderId) {
         UploadFile uploadFile = new UploadFile(bizType, bizId, fileName, fileUrl, fileSize, uploaderId);
-        UploadFileDao.INSTANCE.insert(uploadFile);
+        UploadFileDao.insert(uploadFile);
         return uploadFile;
     }
 
@@ -26,6 +26,6 @@ public class UploadService {
      * 按业务类型和业务ID查询上传文件
      */
     public static List<UploadFile> findByBizTypeAndBizId(String bizType, Integer bizId) {
-        return UploadFileDao.INSTANCE.findByBizTypeAndBizId(bizType, bizId);
+        return UploadFileDao.findByBizTypeAndBizId(bizType, bizId);
     }
 }

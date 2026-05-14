@@ -27,7 +27,7 @@ public class Notification {
     private String content;
     private String link;
     private Integer senderId;
-    private int isRead;
+    private boolean isRead;
     private LocalDateTime createTime;
 
     public Notification(Integer userId, int type, String title, String content, String link, Integer senderId) {
@@ -37,7 +37,7 @@ public class Notification {
         this.content = content;
         this.link = link;
         this.senderId = senderId;
-        this.isRead = 0;
+        this.isRead = false;
         this.createTime = LocalDateTime.now();
     }
 }

@@ -1,6 +1,6 @@
 package top.xihale.xdocs.dao;
 
-import top.xihale.xdocs.util.SqlBuilder;
+import top.xihale.xdocs.util.Db;
 
 import java.util.List;
 
@@ -15,14 +15,14 @@ public class FavoriteDao {
     public static final int TYPE_KB = 1;
 
     public static boolean insert(int userId, int targetType, int targetId) {
-        return SqlBuilder.update("INSERT IGNORE INTO favorite(user_id, target_type, target_id) VALUES(?, ?, ?)")
-                .param(userId).param(targetType).param(targetId)
+        return Db.sql("INSERT IGNORE INTO favorite(user_id, target_type, target_id) VALUES(:userId, :targetType, :targetId)")
+                .param("userId", userId).param("targetType", targetType).param("targetId", targetId)
                 .execute() > 0;
     }
 
     public static boolean delete(int userId, int targetType, int targetId) {
-        return SqlBuilder.update("DELETE FROM favorite WHERE user_id = ? AND target_type = ? AND target_id = ?")
-                .param(userId).param(targetType).param(targetId)
+        return Db.sql("DELETE FROM favorite WHERE user_id = :userId AND target_type = :targetType AND target_id = :targetId")
+                .param("userId", userId).param("targetType", targetType).param("targetId", targetId)
                 .execute() > 0;
     }
 
@@ -30,15 +30,16 @@ public class FavoriteDao {
      * 删除指定文章的所有收藏记录
      */
     public static int deleteByTargetId(int targetType, int targetId) {
-        return SqlBuilder.update("DELETE FROM favorite WHERE target_type = ? AND target_id = ?")
-                .param(targetType).param(targetId)
+        return Db.sql("DELETE FROM favorite WHERE target_type = :targetType AND target_id = :targetId")
+                .param("targetType", targetType).param("targetId", targetId)
                 .execute();
     }
 
     public static boolean exists(int userId, int targetType, int targetId) {
-        return SqlBuilder.select("SELECT 1 FROM favorite WHERE user_id = ? AND target_type = ? AND target_id = ? LIMIT 1")
-                .param(userId).param(targetType).param(targetId)
-                .queryExists();
+        return Db.sql("SELECT 1 FROM favorite WHERE user_id = :userId AND target_type = :targetType AND target_id = :targetId LIMIT 1")
+                .param("userId", userId).param("targetType", targetType).param("targetId", targetId)
+                .query(Integer.class)
+                .exists();
     }
 
     /** 获取用户收藏的文章ID列表 */
@@ -52,8 +53,9 @@ public class FavoriteDao {
     }
 
     private static List<Integer> findTargetIds(int userId, int targetType) {
-        return SqlBuilder.select("SELECT target_id FROM favorite WHERE user_id = ? AND target_type = ? ORDER BY create_time DESC")
-                .param(userId).param(targetType)
-                .queryList(rs -> rs.getInt(1));
+        return Db.sql("SELECT target_id FROM favorite WHERE user_id = :userId AND target_type = :targetType ORDER BY create_time DESC")
+                .param("userId", userId).param("targetType", targetType)
+                .query(rs -> rs.getInt(1))
+                .list();
     }
 }

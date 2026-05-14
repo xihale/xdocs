@@ -3,26 +3,28 @@ package top.xihale.xdocs.vo;
 import lombok.AllArgsConstructor;
 import lombok.Builder;
 import lombok.Getter;
+import lombok.NoArgsConstructor;
 import lombok.Setter;
 
 import java.time.LocalDateTime;
 
 /**
- * TEAM 成员视图对象，附带用户信息
+ * 知识库成员视图对象，附带用户信息
  */
 @Getter
 @Setter
 @Builder
 @AllArgsConstructor
-public class TeamMemberVO {
+@NoArgsConstructor
+public class KbMemberVO {
     private Integer id;
-    private Integer teamId;
+    private Integer kbId;
     private Integer userId;
     private String username;
     private String nickname;
     private String avatarUrl;
     private int role;
     private String roleName;
-    private int joinStatus;
+    private int inviteStatus;
     private LocalDateTime joinTime;
 }

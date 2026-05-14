@@ -1,6 +1,6 @@
 package top.xihale.xdocs.dao;
 
-import top.xihale.xdocs.util.SqlBuilder;
+import top.xihale.xdocs.util.Db;
 
 /**
  * 文章点赞数据访问层
@@ -13,8 +13,8 @@ public class ArticleLikeDao {
      * @return true 表示插入成功，false 表示已点赞
      */
     public static boolean insert(int articleId, int userId) {
-        return SqlBuilder.update("INSERT IGNORE INTO article_like(article_id, user_id) VALUES(?, ?)")
-                .param(articleId).param(userId)
+        return Db.sql("INSERT IGNORE INTO article_like(article_id, user_id) VALUES(:articleId, :userId)")
+                .param("articleId", articleId).param("userId", userId)
                 .execute() > 0;
     }
 
@@ -24,8 +24,8 @@ public class ArticleLikeDao {
      * @return true 表示删除成功，false 表示未点赞
      */
     public static boolean delete(int articleId, int userId) {
-        return SqlBuilder.update("DELETE FROM article_like WHERE article_id = ? AND user_id = ?")
-                .param(articleId).param(userId)
+        return Db.sql("DELETE FROM article_like WHERE article_id = :articleId AND user_id = :userId")
+                .param("articleId", articleId).param("userId", userId)
                 .execute() > 0;
     }
 
@@ -33,8 +33,8 @@ public class ArticleLikeDao {
      * 删除文章的所有点赞记录
      */
     public static int deleteByArticleId(int articleId) {
-        return SqlBuilder.update("DELETE FROM article_like WHERE article_id = ?")
-                .param(articleId)
+        return Db.sql("DELETE FROM article_like WHERE article_id = :articleId")
+                .param("articleId", articleId)
                 .execute();
     }
 
@@ -42,17 +42,19 @@ public class ArticleLikeDao {
      * 查询用户是否已点赞
      */
     public static boolean exists(int articleId, int userId) {
-        return SqlBuilder.select("SELECT 1 FROM article_like WHERE article_id = ? AND user_id = ? LIMIT 1")
-                .param(articleId).param(userId)
-                .queryExists();
+        return Db.sql("SELECT 1 FROM article_like WHERE article_id = :articleId AND user_id = :userId LIMIT 1")
+                .param("articleId", articleId).param("userId", userId)
+                .query(Integer.class)
+                .exists();
     }
 
     /**
      * 统计文章点赞数
      */
     public static int countByArticle(int articleId) {
-        return SqlBuilder.select("SELECT COUNT(*) FROM article_like WHERE article_id = ?")
-                .param(articleId)
-                .queryCount();
+        return Db.sql("SELECT COUNT(*) FROM article_like WHERE article_id = :articleId")
+                .param("articleId", articleId)
+                .query(Integer.class)
+                .count();
     }
 }

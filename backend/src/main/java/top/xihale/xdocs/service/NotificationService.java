@@ -9,11 +9,10 @@ import top.xihale.xdocs.dao.KnowledgeBaseDao;
 import top.xihale.xdocs.po.Notification;
 import top.xihale.xdocs.po.TeamMember;
 import top.xihale.xdocs.po.User;
+import top.xihale.xdocs.vo.NotificationVO;
 
 import java.util.ArrayList;
-import java.util.LinkedHashMap;
 import java.util.List;
-import java.util.Map;
 
 /**
  * 通知业务逻辑层
@@ -29,7 +28,7 @@ public class NotificationService {
     public static void send(int userId, NotificationType type, String title, String content, String link, Integer senderId) {
         try {
             Notification notification = new Notification(userId, type.getCode(), title, content, link, senderId);
-            NotificationDao.INSTANCE.insert(notification);
+            NotificationDao.insert(notification);
             // 实时推送
             pushToUser(userId, notification);
         } catch (Exception e) {
@@ -67,7 +66,7 @@ public class NotificationService {
      * 团队新文章通知（通知团队内除作者外的所有成员）
      */
     public static void notifyTeamNewArticle(int teamId, String teamName, int articleId, String articleTitle, int authorId) {
-        List<TeamMember> members = TeamMemberDao.INSTANCE.findByTeamId(teamId);
+        List<TeamMember> members = TeamMemberDao.findByTeamId(teamId);
         for (TeamMember m : members) {
             if (m.getUserId() == authorId) continue;
             send(m.getUserId(), NotificationType.TEAM_NEW_ARTICLE,
@@ -164,9 +163,9 @@ public class NotificationService {
      * - 私有团队知识库：团队成员 或 KB 成员可见
      */
     private static boolean canFollowerViewArticle(int articleId, int followerId) {
-        var article = top.xihale.xdocs.dao.ArticleDao.INSTANCE.findById(articleId).orElse(null);
+        var article = top.xihale.xdocs.dao.ArticleDao.findById(articleId).orElse(null);
         if (article == null) return false;
-        var kb = top.xihale.xdocs.dao.KnowledgeBaseDao.INSTANCE.findById(article.getKnowledgeBaseId()).orElse(null);
+        var kb = top.xihale.xdocs.dao.KnowledgeBaseDao.findById(article.getKnowledgeBaseId()).orElse(null);
         if (kb == null) return false;
 
         // 公开知识库 → 所有人可见
@@ -175,7 +174,7 @@ public class NotificationService {
         }
 
         // 私有知识库 → 检查 KB 成员
-        var kbMember = top.xihale.xdocs.dao.KnowledgeBaseMemberDao.INSTANCE
+        var kbMember = top.xihale.xdocs.dao.KnowledgeBaseMemberDao
                 .findByKbIdAndUserId(kb.getId(), followerId)
                 .orElse(null);
         if (kbMember != null && kbMember.getInviteStatus() == top.xihale.xdocs.constant.JoinStatus.ACCEPTED.getCode()) {
@@ -184,7 +183,7 @@ public class NotificationService {
 
         // 私有团队知识库 → 检查团队成员
         if (kb.getOwnerType() == top.xihale.xdocs.constant.OwnerType.TEAM.getCode()) {
-            return top.xihale.xdocs.dao.TeamMemberDao.INSTANCE
+            return top.xihale.xdocs.dao.TeamMemberDao
                     .findByTeamIdAndUserId(kb.getOwnerId(), followerId)
                     .map(m -> m.getJoinStatus() == top.xihale.xdocs.constant.JoinStatus.ACCEPTED.getCode())
                     .orElse(false);
@@ -195,9 +194,9 @@ public class NotificationService {
 
     // ==================== 查询 ====================
 
-    public static List<Map<String, Object>> listNotifications(int userId, int offset, int limit) {
-        List<Notification> notifications = NotificationDao.INSTANCE.findByUserId(userId, offset, limit);
-        List<Map<String, Object>> result = new ArrayList<>();
+    public static List<NotificationVO> listNotifications(int userId, int offset, int limit) {
+        List<Notification> notifications = NotificationDao.findByUserId(userId, offset, limit);
+        List<NotificationVO> result = new ArrayList<>();
         for (Notification n : notifications) {
             result.add(toVO(n));
         }
@@ -205,45 +204,51 @@ public class NotificationService {
     }
 
     public static int unreadCount(int userId) {
-        return NotificationDao.INSTANCE.countUnread(userId);
+        return NotificationDao.countUnread(userId);
     }
 
     public static void markRead(int notificationId, int userId) {
-        NotificationDao.INSTANCE.markRead(notificationId, userId);
+        NotificationDao.markRead(notificationId, userId);
     }
 
     public static void markAllRead(int userId) {
-        NotificationDao.INSTANCE.markAllRead(userId);
+        NotificationDao.markAllRead(userId);
     }
 
     public static void deleteNotification(int notificationId, int userId) {
-        NotificationDao.INSTANCE.delete(notificationId, userId);
+        NotificationDao.delete(notificationId, userId);
     }
 
     // ==================== VO 转换 ====================
 
-    private static Map<String, Object> toVO(Notification n) {
-        Map<String, Object> vo = new LinkedHashMap<>();
-        vo.put("id", n.getId());
-        vo.put("type", n.getType());
-        vo.put("title", n.getTitle());
-        vo.put("content", n.getContent());
-        vo.put("link", n.getLink());
-        vo.put("isRead", n.getIsRead());
-        vo.put("createTime", n.getCreateTime());
-
+    private static NotificationVO toVO(Notification n) {
         // 发送者信息
+        Integer senderId = null;
+        String senderName = null;
+        String senderAvatar = null;
         if (n.getSenderId() != null) {
-            User sender = UserDao.INSTANCE.findById(n.getSenderId()).orElse(null);
-            vo.put("senderId", n.getSenderId());
-            vo.put("senderName", sender != null ? getDisplayName(sender) : null);
-            vo.put("senderAvatar", sender != null ? sender.getAvatarUrl() : null);
+            senderId = n.getSenderId();
+            User sender = UserDao.findById(n.getSenderId()).orElse(null);
+            senderName = sender != null ? getDisplayName(sender) : null;
+            senderAvatar = sender != null ? sender.getAvatarUrl() : null;
         }
-        return vo;
+
+        return NotificationVO.builder()
+                .id(n.getId())
+                .type(n.getType())
+                .title(n.getTitle())
+                .content(n.getContent())
+                .link(n.getLink())
+                .isRead(n.isRead())
+                .createTime(n.getCreateTime())
+                .senderId(senderId)
+                .senderName(senderName)
+                .senderAvatar(senderAvatar)
+                .build();
     }
 
     private static String getDisplayName(int userId) {
-        return UserDao.INSTANCE.findById(userId)
+        return UserDao.findById(userId)
                 .map(NotificationService::getDisplayName)
                 .orElse("未知用户");
     }

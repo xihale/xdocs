@@ -27,45 +27,49 @@ import java.util.stream.Collectors;
  *     private String title;
  * }
  *
- * // DAO 单例暴露 INSTANCE
- * public class ArticleDao extends BaseMapper&lt;Article&gt; {
- *     public static final ArticleDao INSTANCE = new ArticleDao();
+ * // DAO 组合 BaseMapper，对外暴露静态方法
+ * public class ArticleDao {
+ *     private static final BaseMapper&lt;Article&gt; MAPPER = new BaseMapper&lt;&gt;(Article.class);
+ *     public static void insert(Article a) { MAPPER.insert(a); }
+ *     public static Optional&lt;Article&gt; findById(Object id) { return MAPPER.findById(id); }
  * }
  *
  * // 调用
- * ArticleDao.INSTANCE.insert(article);
- * ArticleDao.INSTANCE.findById(1);
+ * ArticleDao.insert(article);
+ * ArticleDao.findById(1);
  * </pre>
  *
  * @param <E> 实体类型
  */
-public abstract class BaseMapper<E> {
-
+public class BaseMapper<E> {
 
     private static final ConcurrentHashMap<Class<?>, EntityMeta> META_CACHE = new ConcurrentHashMap<>();
 
     private final EntityMeta meta;
     private final RowMapper<E> rowMapper;
 
-
-    protected BaseMapper() {
-        @SuppressWarnings("unchecked")
-        Class<E> clazz = (Class<E>) resolveGenericType();
-
+    public BaseMapper(Class<E> clazz) {
         this.meta = META_CACHE.computeIfAbsent(clazz, EntityMeta::new);
         @SuppressWarnings("unchecked")
         RowMapper<E> m = rs -> mapFromResultSet(rs);
-
         this.rowMapper = m;
     }
+
+    // ==================== SQL 模板 ====================
+
+    private static final String SQL_FIND_BY_ID = "SELECT %s FROM %s WHERE %s = ?";
+    private static final String SQL_FIND_ALL = "SELECT %s FROM %s";
+    private static final String SQL_FIND_LIST = "SELECT %s FROM %s WHERE %s";
+    private static final String SQL_COUNT = "SELECT COUNT(*) FROM %s WHERE %s";
+    private static final String SQL_EXISTS = "SELECT 1 FROM %s WHERE %s LIMIT 1";
+    private static final String SQL_DELETE_BY_ID = "DELETE FROM %s WHERE %s = ?";
 
     // ==================== CRUD ====================
 
     /** 插入实体并回填自增主键 */
     public void insert(E entity) {
-
         List<FieldMeta> columns = meta.nonIdColumns;
-        int id = SqlBuilder.update(buildInsertSql(columns))
+        int id = Db.sql(buildInsertSql(columns))
                 .params(extractValues(entity, columns))
                 .executeReturnKey();
         setId(entity, id);
@@ -73,9 +77,8 @@ public abstract class BaseMapper<E> {
 
     /** 按主键更新全部非主键字段 */
     public int update(E entity) {
-
         List<FieldMeta> columns = meta.nonIdColumns;
-        return SqlBuilder.update(buildUpdateSql(columns))
+        return Db.sql(buildUpdateSql(columns))
                 .params(extractValues(entity, columns))
                 .param(getIdValue(entity))
                 .execute();
@@ -83,9 +86,8 @@ public abstract class BaseMapper<E> {
 
     /** 按主键更新指定字段 */
     public int update(E entity, String... fieldNames) {
-
         List<FieldMeta> columns = filterFieldMetas(fieldNames);
-        return SqlBuilder.update(buildUpdateSql(columns))
+        return Db.sql(buildUpdateSql(columns))
                 .params(extractValues(entity, columns))
                 .param(getIdValue(entity))
                 .execute();
@@ -93,61 +95,62 @@ public abstract class BaseMapper<E> {
 
     /** 按主键删除 */
     public int deleteById(Object id) {
-        return SqlBuilder.update("DELETE FROM " + meta.table + " WHERE " + meta.idColumn.columnName + " = ?")
+        return Db.sql(SQL_DELETE_BY_ID.formatted(meta.table, meta.idColumn.columnName))
                 .param(id)
                 .execute();
     }
 
     /** 按主键查单条 */
     public Optional<E> findById(Object id) {
-
-        return SqlBuilder.select("SELECT " + meta.allColumnsStr + " FROM " + meta.table + " WHERE " + meta.idColumn.columnName + " = ?")
+        return Db.sql(SQL_FIND_BY_ID.formatted(meta.allColumnsStr, meta.table, meta.idColumn.columnName))
                 .param(id)
-                .queryOne(rowMapper);
+                .query(rowMapper)
+                .one();
     }
 
     /** 查全表 */
     public List<E> findAll() {
-
-        return SqlBuilder.select("SELECT " + meta.allColumnsStr + " FROM " + meta.table)
-                .queryList(rowMapper);
+        return Db.sql(SQL_FIND_ALL.formatted(meta.allColumnsStr, meta.table))
+                .query(rowMapper)
+                .list();
     }
 
     /** 条件查列表。例: {@code findList("status = ? AND author_id = ?", 1, userId)} */
     public List<E> findList(String whereClause, Object... params) {
-
-        return SqlBuilder.select("SELECT " + meta.allColumnsStr + " FROM " + meta.table + " WHERE " + whereClause)
+        return Db.sql(SQL_FIND_LIST.formatted(meta.allColumnsStr, meta.table, whereClause))
                 .params(params)
-                .queryList(rowMapper);
+                .query(rowMapper)
+                .list();
     }
 
     /** 条件查单条 */
     public Optional<E> findOne(String whereClause, Object... params) {
-
-        return SqlBuilder.select("SELECT " + meta.allColumnsStr + " FROM " + meta.table + " WHERE " + whereClause)
+        return Db.sql(SQL_FIND_LIST.formatted(meta.allColumnsStr, meta.table, whereClause))
                 .params(params)
-                .queryOne(rowMapper);
+                .query(rowMapper)
+                .one();
     }
 
     /** 条件统计 */
     public int count(String whereClause, Object... params) {
-        return SqlBuilder.select("SELECT COUNT(*) FROM " + meta.table + " WHERE " + whereClause)
+        return Db.sql(SQL_COUNT.formatted(meta.table, whereClause))
                 .params(params)
-                .queryCount();
+                .query(rowMapper)
+                .count();
     }
 
     /** 条件判断存在 */
     public boolean exists(String whereClause, Object... params) {
-        return SqlBuilder.select("SELECT 1 FROM " + meta.table + " WHERE " + whereClause + " LIMIT 1")
+        return Db.sql(SQL_EXISTS.formatted(meta.table, whereClause))
                 .params(params)
-                .queryExists();
+                .query(rowMapper)
+                .exists();
     }
 
     // ==================== 查询辅助 ====================
 
-    /** 获取行映射器（用于自定义 SqlBuilder 查询） */
+    /** 获取行映射器（用于自定义 Db 查询） */
     public RowMapper<E> mapper() {
-
         return rowMapper;
     }
 
@@ -165,10 +168,8 @@ public abstract class BaseMapper<E> {
 
     @SuppressWarnings("unchecked")
     private E mapFromResultSet(ResultSet rs) throws SQLException {
-
         try {
             E instance = (E) meta.constructor.newInstance();
-
             for (FieldMeta fm : meta.allColumns) {
                 fm.field.set(instance, readColumn(rs, fm));
             }
@@ -194,18 +195,17 @@ public abstract class BaseMapper<E> {
     private String buildInsertSql(List<FieldMeta> columns) {
         String cols = columns.stream().map(fm -> fm.columnName).collect(Collectors.joining(", "));
         String placeholders = columns.stream().map(fm -> "?").collect(Collectors.joining(", "));
-        return "INSERT INTO " + meta.table + "(" + cols + ") VALUES(" + placeholders + ")";
+        return "INSERT INTO %s(%s) VALUES(%s)".formatted(meta.table, cols, placeholders);
     }
 
     private String buildUpdateSql(List<FieldMeta> columns) {
         String set = columns.stream().map(fm -> fm.columnName + " = ?").collect(Collectors.joining(", "));
-        return "UPDATE " + meta.table + " SET " + set + " WHERE " + meta.idColumn.columnName + " = ?";
+        return "UPDATE %s SET %s WHERE %s = ?".formatted(meta.table, set, meta.idColumn.columnName);
     }
 
     // ==================== 字段值提取 ====================
 
     private Object[] extractValues(E entity, List<FieldMeta> columns) {
-
         Object[] values = new Object[columns.size()];
         for (int i = 0; i < columns.size(); i++) {
             try {
@@ -218,7 +218,6 @@ public abstract class BaseMapper<E> {
     }
 
     private void setId(E entity, int id) {
-
         try {
             meta.idColumn.field.set(entity, id);
         } catch (IllegalAccessException e) {
@@ -227,7 +226,6 @@ public abstract class BaseMapper<E> {
     }
 
     private Object getIdValue(E entity) {
-
         try {
             return meta.idColumn.field.get(entity);
         } catch (IllegalAccessException e) {
@@ -240,21 +238,6 @@ public abstract class BaseMapper<E> {
         return meta.allColumns.stream()
                 .filter(fm -> nameSet.contains(fm.field.getName()))
                 .collect(Collectors.toList());
-    }
-
-    // ==================== 泛型解析 ====================
-
-    private Class<?> resolveGenericType() {
-        Class<?> clazz = getClass();
-        while (clazz != null && clazz != Object.class) {
-            var superType = clazz.getGenericSuperclass();
-            if (superType instanceof java.lang.reflect.ParameterizedType pt) {
-                var arg = pt.getActualTypeArguments()[0];
-                if (arg instanceof Class<?> c) return c;
-            }
-            clazz = clazz.getSuperclass();
-        }
-        throw new IllegalStateException("无法解析 BaseMapper 泛型参数");
     }
 
     // ==================== 元数据 ====================

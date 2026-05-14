@@ -8,11 +8,13 @@ import java.util.List;
 /**
  * 上传文件数据访问层
  */
-public class UploadFileDao extends BaseMapper<UploadFile> {
+public class UploadFileDao {
 
-    public static final UploadFileDao INSTANCE = new UploadFileDao();
+    private static final BaseMapper<UploadFile> MAPPER = new BaseMapper<>(UploadFile.class);
 
-    public List<UploadFile> findByBizTypeAndBizId(String bizType, Integer bizId) {
-        return findList("biz_type = ? AND biz_id = ?", bizType, bizId);
+    public static void insert(UploadFile file) { MAPPER.insert(file); }
+
+    public static List<UploadFile> findByBizTypeAndBizId(String bizType, Integer bizId) {
+        return MAPPER.findList("biz_type = ? AND biz_id = ?", bizType, bizId);
     }
 }

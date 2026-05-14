@@ -14,7 +14,6 @@ import java.io.IOException;
 import java.lang.reflect.Type;
 import java.time.LocalDateTime;
 import java.util.*;
-
 import java.util.logging.Level;
 import java.util.logging.Logger;
 
@@ -46,6 +45,11 @@ public class ChatWebSocket extends BaseWebSocket {
 
     public record UserInfo(int userId, String nickname, String avatarUrl) {}
 
+    // WS 内部消息类型
+    record SystemMessage(String type, String content) {}
+    record ChatBroadcast(String type, int articleId, int senderId, String senderName, String senderAvatar, String content, String createTime) {}
+    record OnlineMessage(String type, List<UserInfo> users) {}
+
     @OnOpen
     public void onOpen(Session session, @PathParam("articleId") String articleId) {
         if (!checkOrigin(session)) return;
@@ -72,10 +76,7 @@ public class ChatWebSocket extends BaseWebSocket {
         roomManager.closeReplacedSession(previousSession);
 
         // 广播系统消息：xxx 加入了聊天
-        Map<String, Object> sysMsg = new LinkedHashMap<>();
-        sysMsg.put("type", "system");
-        sysMsg.put("content", userInfo.nickname + " 加入了聊天");
-        roomManager.broadcastText(articleId, JsonUtils.toJson(sysMsg), session);
+        roomManager.broadcastText(articleId, JsonUtils.toJson(new SystemMessage("system", userInfo.nickname + " 加入了聊天")), session);
 
         // 广播在线列表
         broadcastOnlineList(articleId);
@@ -103,15 +104,15 @@ public class ChatWebSocket extends BaseWebSocket {
                 ChatService.sendMessage(Integer.parseInt(articleId), null, userInfo.userId, 0, content);
 
                 // 广播给房间所有人
-                Map<String, Object> chatMsg = new LinkedHashMap<>();
-                chatMsg.put("type", "chat");
-                chatMsg.put("articleId", Integer.parseInt(articleId));
-                chatMsg.put("senderId", userInfo.userId);
-                chatMsg.put("senderName", userInfo.nickname);
-                chatMsg.put("senderAvatar", userInfo.avatarUrl);
-                chatMsg.put("content", content);
-                chatMsg.put("createTime", LocalDateTime.now().toString());
-                roomManager.broadcastText(articleId, JsonUtils.toJson(chatMsg));
+                roomManager.broadcastText(articleId, JsonUtils.toJson(new ChatBroadcast(
+                        "chat",
+                        Integer.parseInt(articleId),
+                        userInfo.userId,
+                        userInfo.nickname,
+                        userInfo.avatarUrl,
+                        content,
+                        LocalDateTime.now().toString()
+                )));
             }
         } catch (Exception e) {
             LOGGER.log(Level.WARNING, "Failed to process chat message", e);
@@ -130,10 +131,7 @@ public class ChatWebSocket extends BaseWebSocket {
 
         // 被替代的 session 不广播离开消息（已由新 session 的加入消息替代）
         if (userInfo != null && !replaced) {
-            Map<String, Object> sysMsg = new LinkedHashMap<>();
-            sysMsg.put("type", "system");
-            sysMsg.put("content", userInfo.nickname + " 离开了聊天");
-            roomManager.broadcastText(articleId, JsonUtils.toJson(sysMsg));
+            roomManager.broadcastText(articleId, JsonUtils.toJson(new SystemMessage("system", userInfo.nickname + " 离开了聊天")));
             broadcastOnlineList(articleId);
         }
     }
@@ -176,16 +174,8 @@ public class ChatWebSocket extends BaseWebSocket {
     // ==================== Internal ====================
 
     private void broadcastOnlineList(String articleId) {
-        List<UserInfo> onlineUsers = getOnlineUsers(articleId);
-        Map<String, Object> msg = new LinkedHashMap<>();
-        msg.put("type", "online");
-        msg.put("users", onlineUsers.stream().map(u -> {
-            Map<String, Object> m = new LinkedHashMap<>();
-            m.put("userId", u.userId);
-            m.put("nickname", u.nickname);
-            m.put("avatarUrl", u.avatarUrl);
-            return m;
-        }).toList());
-        roomManager.broadcastText(articleId, JsonUtils.toJson(msg));
+        roomManager.broadcastText(articleId, JsonUtils.toJson(
+                new OnlineMessage("online", getOnlineUsers(articleId))
+        ));
     }
 }

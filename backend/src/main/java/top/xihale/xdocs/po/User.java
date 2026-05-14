@@ -72,16 +72,16 @@ public class User {
      * 转为视图对象，不包含密码等敏感字段
      */
     public UserVO toVO() {
-        UserVO vo = new UserVO();
-        vo.setId(id);
-        vo.setUsername(username);
-        vo.setEmail(email);
-        vo.setNickname(nickname);
-        vo.setAvatarUrl(avatarUrl);
-        vo.setRole(role);
-        vo.setStatus(status);
-        vo.setCreateTime(createTime);
-        vo.setUpdateTime(updateTime);
-        return vo;
+        return UserVO.builder()
+                .id(id)
+                .username(username)
+                .nickname(nickname)
+                .email(email)
+                .avatarUrl(avatarUrl)
+                .role(role)
+                .status(status)
+                .createTime(createTime)
+                .updateTime(updateTime)
+                .build();
     }
 }

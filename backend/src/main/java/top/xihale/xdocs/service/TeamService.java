@@ -10,15 +10,13 @@ import top.xihale.xdocs.exception.TeamException.TeamError;
 import top.xihale.xdocs.po.Team;
 import top.xihale.xdocs.po.TeamMember;
 import top.xihale.xdocs.po.User;
-import top.xihale.xdocs.util.SqlBuilder;
-import top.xihale.xdocs.service.NotificationService;
+import top.xihale.xdocs.util.Db;
 import top.xihale.xdocs.vo.TeamMemberVO;
+import top.xihale.xdocs.vo.TeamPendingInviteVO;
 import top.xihale.xdocs.vo.TeamVO;
 
 import java.util.ArrayList;
-import java.util.LinkedHashMap;
 import java.util.List;
-import java.util.Map;
 
 /**
  * TEAM 业务逻辑层
@@ -26,9 +24,9 @@ import java.util.Map;
 public class TeamService {
 
     public static Team createTeam(String name, String description, int ownerId) {
-        return SqlBuilder.inTransaction(conn -> {
+        return Db.inTransaction(conn -> {
             Team team = new Team(name, description, ownerId);
-            TeamDao.INSTANCE.insert(team);
+            TeamDao.insert(team);
             // 自动将创建者添加为 OWNER 成员
             TeamMember ownerMember = new TeamMember(
                     team.getId(), ownerId,
@@ -36,32 +34,32 @@ public class TeamService {
                     JoinStatus.ACCEPTED.getCode(),
                     null
             );
-            TeamMemberDao.INSTANCE.insert(ownerMember);
+            TeamMemberDao.insert(ownerMember);
             return team;
         });
     }
 
     public static Team findTeamById(int id) {
-        return TeamDao.INSTANCE.findById(id)
+        return TeamDao.findById(id)
                 .orElseThrow(() -> new TeamException(TeamError.TEAM_NOT_FOUND));
     }
 
     public static List<Team> findTeamsByUserId(int userId) {
-        return TeamDao.INSTANCE.findByUserId(userId);
+        return TeamDao.findByUserId(userId);
     }
 
     public static void inviteMember(int teamId, int userId, int inviterId) {
         // 校验 Team 存在
         findTeamById(teamId);
         // 校验操作者是 TEAM 的 OWNER 或 ADMIN
-        TeamMember inviter = TeamMemberDao.INSTANCE.findByTeamIdAndUserId(teamId, inviterId)
+        TeamMember inviter = TeamMemberDao.findByTeamIdAndUserId(teamId, inviterId)
                 .orElseThrow(() -> new TeamException(TeamError.OPERATOR_NOT_IN_TEAM));
         if (inviter.getRole() != TeamRole.OWNER.getCode()
                 && inviter.getRole() != TeamRole.ADMIN.getCode()) {
             throw new TeamException(TeamError.INVITE_REQUIRES_OWNER_OR_ADMIN);
         }
         // 校验目标用户不在 TEAM 中（不存在或已被拒绝）
-        TeamMember existing = TeamMemberDao.INSTANCE.findByTeamIdAndUserId(teamId, userId).orElse(null);
+        TeamMember existing = TeamMemberDao.findByTeamIdAndUserId(teamId, userId).orElse(null);
         if (existing != null && existing.getJoinStatus() != JoinStatus.REJECTED.getCode()) {
             throw new TeamException(TeamError.USER_ALREADY_IN_TEAM);
         }
@@ -72,28 +70,28 @@ public class TeamService {
                 JoinStatus.INVITED.getCode(),
                 inviterId
         );
-        TeamMemberDao.INSTANCE.insert(member);
+        TeamMemberDao.insert(member);
 
         // 发送邀请通知
-        Team team = TeamDao.INSTANCE.findById(teamId).orElse(null);
+        Team team = TeamDao.findById(teamId).orElse(null);
         NotificationService.notifyTeamInvite(teamId,
                 team != null ? team.getName() : "未知团队",
                 userId, inviterId);
     }
 
     public static void acceptInvite(int teamId, int userId) {
-        TeamMember member = TeamMemberDao.INSTANCE.findByTeamIdAndUserId(teamId, userId)
+        TeamMember member = TeamMemberDao.findByTeamIdAndUserId(teamId, userId)
                 .orElseThrow(() -> new TeamException(TeamError.INVITE_NOT_FOUND));
         if (member.getJoinStatus() != JoinStatus.INVITED.getCode()) {
             throw new TeamException(TeamError.INVITE_STATUS_NOT_PENDING);
         }
-        TeamMemberDao.INSTANCE.updateJoinStatus(teamId, userId, JoinStatus.ACCEPTED.getCode());
+        TeamMemberDao.updateJoinStatus(teamId, userId, JoinStatus.ACCEPTED.getCode());
 
         // 通知邀请者
-        TeamMember member2 = TeamMemberDao.INSTANCE.findByTeamIdAndUserId(teamId, userId).orElse(null);
+        TeamMember member2 = TeamMemberDao.findByTeamIdAndUserId(teamId, userId).orElse(null);
         if (member2 != null && member2.getInviteBy() != null) {
-            Team team = TeamDao.INSTANCE.findById(teamId).orElse(null);
-            String userName = UserDao.INSTANCE.findById(userId)
+            Team team = TeamDao.findById(teamId).orElse(null);
+            String userName = UserDao.findById(userId)
                     .map(u -> u.getNickname() != null ? u.getNickname() : u.getUsername())
                     .orElse("未知用户");
             NotificationService.notifyMemberChange(member2.getInviteBy(),
@@ -104,33 +102,33 @@ public class TeamService {
     }
 
     public static void rejectInvite(int teamId, int userId) {
-        TeamMember member = TeamMemberDao.INSTANCE.findByTeamIdAndUserId(teamId, userId)
+        TeamMember member = TeamMemberDao.findByTeamIdAndUserId(teamId, userId)
                 .orElseThrow(() -> new TeamException(TeamError.INVITE_NOT_FOUND));
         if (member.getJoinStatus() != JoinStatus.INVITED.getCode()) {
             throw new TeamException(TeamError.INVITE_STATUS_NOT_PENDING);
         }
-        TeamMemberDao.INSTANCE.updateJoinStatus(teamId, userId, JoinStatus.REJECTED.getCode());
+        TeamMemberDao.updateJoinStatus(teamId, userId, JoinStatus.REJECTED.getCode());
     }
 
     public static void removeMember(int teamId, int userId, int operatorId) {
         // 校验操作者是 OWNER 或 ADMIN
-        TeamMember operator = TeamMemberDao.INSTANCE.findByTeamIdAndUserId(teamId, operatorId)
+        TeamMember operator = TeamMemberDao.findByTeamIdAndUserId(teamId, operatorId)
                 .orElseThrow(() -> new TeamException(TeamError.OPERATOR_NOT_IN_TEAM));
         if (operator.getRole() != TeamRole.OWNER.getCode()
                 && operator.getRole() != TeamRole.ADMIN.getCode()) {
             throw new TeamException(TeamError.REMOVE_REQUIRES_OWNER_OR_ADMIN);
         }
         // 不能移除 OWNER
-        TeamMember target = TeamMemberDao.INSTANCE.findByTeamIdAndUserId(teamId, userId)
+        TeamMember target = TeamMemberDao.findByTeamIdAndUserId(teamId, userId)
                 .orElseThrow(() -> new TeamException(TeamError.TARGET_MEMBER_NOT_FOUND));
         if (target.getRole() == TeamRole.OWNER.getCode()) {
             throw new TeamException(TeamError.CANNOT_REMOVE_OWNER);
         }
-        TeamMemberDao.INSTANCE.delete(teamId, userId);
+        TeamMemberDao.delete(teamId, userId);
 
         // 通知被移除的用户
-        Team team = TeamDao.INSTANCE.findById(teamId).orElse(null);
-        String operatorName = UserDao.INSTANCE.findById(operatorId)
+        Team team = TeamDao.findById(teamId).orElse(null);
+        String operatorName = UserDao.findById(operatorId)
                 .map(u -> u.getNickname() != null ? u.getNickname() : u.getUsername())
                 .orElse("未知用户");
         NotificationService.notifyMemberChange(userId,
@@ -141,34 +139,34 @@ public class TeamService {
 
     public static void updateMemberRole(int teamId, int userId, int role, int operatorId) {
         // 校验操作者是 OWNER
-        TeamMember operator = TeamMemberDao.INSTANCE.findByTeamIdAndUserId(teamId, operatorId)
+        TeamMember operator = TeamMemberDao.findByTeamIdAndUserId(teamId, operatorId)
                 .orElseThrow(() -> new TeamException(TeamError.OPERATOR_NOT_IN_TEAM));
         if (operator.getRole() != TeamRole.OWNER.getCode()) {
             throw new TeamException(TeamError.ROLE_CHANGE_REQUIRES_OWNER);
         }
         // 不能修改 OWNER 的角色
-        TeamMember target = TeamMemberDao.INSTANCE.findByTeamIdAndUserId(teamId, userId)
+        TeamMember target = TeamMemberDao.findByTeamIdAndUserId(teamId, userId)
                 .orElseThrow(() -> new TeamException(TeamError.TARGET_MEMBER_NOT_FOUND));
         if (target.getRole() == TeamRole.OWNER.getCode()) {
             throw new TeamException(TeamError.CANNOT_CHANGE_OWNER_ROLE);
         }
-        TeamMemberDao.INSTANCE.updateRole(teamId, userId, role);
+        TeamMemberDao.updateRole(teamId, userId, role);
     }
 
     public static void cancelInvite(int teamId, int userId, int operatorId) {
         // 校验操作者是 OWNER 或 ADMIN
-        TeamMember operator = TeamMemberDao.INSTANCE.findByTeamIdAndUserId(teamId, operatorId)
+        TeamMember operator = TeamMemberDao.findByTeamIdAndUserId(teamId, operatorId)
                 .orElseThrow(() -> new TeamException(TeamError.OPERATOR_NOT_IN_TEAM));
         if (operator.getRole() != TeamRole.OWNER.getCode()
                 && operator.getRole() != TeamRole.ADMIN.getCode()) {
             throw new TeamException(TeamError.CANCEL_INVITE_REQUIRES_OWNER_OR_ADMIN);
         }
-        TeamMember target = TeamMemberDao.INSTANCE.findByTeamIdAndUserId(teamId, userId)
+        TeamMember target = TeamMemberDao.findByTeamIdAndUserId(teamId, userId)
                 .orElseThrow(() -> new TeamException(TeamError.INVITE_NOT_FOUND));
         if (target.getJoinStatus() != JoinStatus.INVITED.getCode()) {
             throw new TeamException(TeamError.NO_PENDING_INVITE);
         }
-        TeamMemberDao.INSTANCE.delete(teamId, userId);
+        TeamMemberDao.delete(teamId, userId);
     }
 
     // ==================== 查询辅助 ====================
@@ -182,41 +180,41 @@ public class TeamService {
     }
 
     public static TeamVO buildTeamVO(Team team) {
-        List<TeamMember> members = TeamMemberDao.INSTANCE.findByTeamId(team.getId());
-        User owner = UserDao.INSTANCE.findById(team.getOwnerId()).orElse(null);
+        List<TeamMember> members = TeamMemberDao.findByTeamId(team.getId());
+        User owner = UserDao.findById(team.getOwnerId()).orElse(null);
 
-        TeamVO vo = new TeamVO();
-        vo.setId(team.getId());
-        vo.setName(team.getName());
-        vo.setDescription(team.getDescription());
-        vo.setOwnerId(team.getOwnerId());
-        vo.setOwnerName(owner != null ? owner.getNickname() : null);
-        vo.setOwnerAvatar(owner != null ? owner.getAvatarUrl() : null);
-        vo.setAvatarUrl(team.getAvatarUrl());
-        vo.setMemberCount(members.size());
-        vo.setCreateTime(team.getCreateTime());
-        vo.setUpdateTime(team.getUpdateTime());
-        return vo;
+        return TeamVO.builder()
+                .id(team.getId())
+                .name(team.getName())
+                .description(team.getDescription())
+                .ownerId(team.getOwnerId())
+                .ownerName(owner != null ? owner.getNickname() : null)
+                .ownerAvatar(owner != null ? owner.getAvatarUrl() : null)
+                .avatarUrl(team.getAvatarUrl())
+                .memberCount(members.size())
+                .createTime(team.getCreateTime())
+                .updateTime(team.getUpdateTime())
+                .build();
     }
 
     public static List<TeamMemberVO> buildMemberVOList(int teamId) {
-        List<TeamMember> members = TeamMemberDao.INSTANCE.findByTeamId(teamId);
+        List<TeamMember> members = TeamMemberDao.findByTeamId(teamId);
         List<TeamMemberVO> accepted = new ArrayList<>();
         List<TeamMemberVO> invited = new ArrayList<>();
         for (TeamMember m : members) {
-            User user = UserDao.INSTANCE.findById(m.getUserId()).orElse(null);
-            TeamMemberVO vo = new TeamMemberVO(
-                    m.getId(),
-                    m.getTeamId(),
-                    m.getUserId(),
-                    user != null ? user.getUsername() : null,
-                    user != null ? user.getNickname() : null,
-                    user != null ? user.getAvatarUrl() : null,
-                    m.getRole(),
-                    TeamRole.fromCode(m.getRole()).name(),
-                    m.getJoinStatus(),
-                    m.getJoinTime()
-            );
+            User user = UserDao.findById(m.getUserId()).orElse(null);
+            TeamMemberVO vo = TeamMemberVO.builder()
+                    .id(m.getId())
+                    .teamId(m.getTeamId())
+                    .userId(m.getUserId())
+                    .username(user != null ? user.getUsername() : null)
+                    .nickname(user != null ? user.getNickname() : null)
+                    .avatarUrl(user != null ? user.getAvatarUrl() : null)
+                    .role(m.getRole())
+                    .roleName(TeamRole.fromCode(m.getRole()).name())
+                    .joinStatus(m.getJoinStatus())
+                    .joinTime(m.getJoinTime())
+                    .build();
             if (m.getJoinStatus() == JoinStatus.ACCEPTED.getCode()) {
                 accepted.add(vo);
             } else if (m.getJoinStatus() == JoinStatus.INVITED.getCode()) {
@@ -229,18 +227,18 @@ public class TeamService {
         return result;
     }
 
-    public static List<Map<String, Object>> buildPendingInviteList(int userId) {
-        List<TeamMember> pending = TeamMemberDao.INSTANCE.findPendingByUserId(userId);
-        List<Map<String, Object>> result = new ArrayList<>();
+    public static List<TeamPendingInviteVO> buildPendingInviteList(int userId) {
+        List<TeamMember> pending = TeamMemberDao.findPendingByUserId(userId);
+        List<TeamPendingInviteVO> result = new ArrayList<>();
         for (TeamMember member : pending) {
-            Team team = TeamDao.INSTANCE.findById(member.getTeamId()).orElse(null);
-            Map<String, Object> item = new LinkedHashMap<>();
-            item.put("id", member.getId());
-            item.put("teamId", member.getTeamId());
-            item.put("teamName", team != null ? team.getName() : null);
-            item.put("joinStatus", member.getJoinStatus());
-            item.put("joinTime", member.getJoinTime());
-            result.add(item);
+            Team team = TeamDao.findById(member.getTeamId()).orElse(null);
+            result.add(TeamPendingInviteVO.builder()
+                    .id(member.getId())
+                    .teamId(member.getTeamId())
+                    .teamName(team != null ? team.getName() : null)
+                    .joinStatus(member.getJoinStatus())
+                    .joinTime(member.getJoinTime())
+                    .build());
         }
         return result;
     }

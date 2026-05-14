@@ -9,20 +9,23 @@ import lombok.Setter;
 import java.time.LocalDateTime;
 
 /**
- * 聊天消息视图对象，附带发送者信息
+ * 评论视图对象，附带发送者信息
  */
 @Getter
 @Setter
 @Builder
 @AllArgsConstructor
 @NoArgsConstructor
-public class ChatMessageVO {
+public class CommentVO {
     private Integer id;
     private Integer articleId;
-    private Integer senderId;
-    private String senderName;
-    private String senderAvatar;
-    private int messageType;
+    private Integer userId;
+    private String username;
+    private String nickname;
+    private String avatarUrl;
+    private Integer parentId;
+    private Integer replyToId;
+    private String replyToNickname;
     private String content;
-    private LocalDateTime createTime;
+    private String createTime;
 }

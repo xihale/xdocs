@@ -12,13 +12,13 @@ import top.xihale.xdocs.po.KnowledgeBase;
 import top.xihale.xdocs.po.KnowledgeBaseMember;
 import top.xihale.xdocs.po.TeamMember;
 import top.xihale.xdocs.po.User;
-import top.xihale.xdocs.service.NotificationService;
 import top.xihale.xdocs.vo.ArticleVO;
+import top.xihale.xdocs.vo.CommentVO;
+import top.xihale.xdocs.vo.CompactArticleVO;
+import top.xihale.xdocs.vo.LikeResultVO;
 
 import java.time.LocalDateTime;
-import java.util.LinkedHashMap;
 import java.util.List;
-import java.util.Map;
 
 /**
  * 文章业务逻辑层
@@ -28,16 +28,16 @@ public class ArticleService {
     // ==================== 文章 CRUD ====================
 
     public static Article createArticle(int kbId, String title, String content, int authorId) {
-        if (KnowledgeBaseDao.INSTANCE.findById(kbId).isEmpty()) {
+        if (KnowledgeBaseDao.findById(kbId).isEmpty()) {
             throw new ArticleException(ArticleError.KB_NOT_FOUND);
         }
         Article article = new Article(kbId, title, content, authorId);
-        ArticleDao.INSTANCE.insert(article);
+        ArticleDao.insert(article);
 
         // 通知团队成员有新文章
-        var kb = KnowledgeBaseDao.INSTANCE.findById(kbId).orElse(null);
+        var kb = KnowledgeBaseDao.findById(kbId).orElse(null);
         if (kb != null && kb.getOwnerType() == OwnerType.TEAM.getCode()) {
-            var team = TeamDao.INSTANCE.findById(kb.getOwnerId()).orElse(null);
+            var team = TeamDao.findById(kb.getOwnerId()).orElse(null);
             if (team != null) {
                 NotificationService.notifyTeamNewArticle(
                         team.getId(), team.getName(),
@@ -49,27 +49,27 @@ public class ArticleService {
     }
 
     public static Article findArticleById(int id) {
-        return ArticleDao.INSTANCE.findById(id)
+        return ArticleDao.findById(id)
                 .orElseThrow(() -> new ArticleException(ArticleError.ARTICLE_NOT_FOUND));
     }
 
     public static List<Article> findByKnowledgeBase(int kbId) {
-        return ArticleDao.INSTANCE.findByKnowledgeBaseId(kbId);
+        return ArticleDao.findByKnowledgeBaseId(kbId);
     }
 
     public static List<Article> findPublicArticles(int offset, int limit) {
-        return ArticleDao.INSTANCE.findPublicArticles(offset, limit);
+        return ArticleDao.findPublicArticles(offset, limit);
     }
 
     public static List<Article> findPublicArticlesOrderByLikes(int offset, int limit) {
-        return ArticleDao.INSTANCE.findPublicArticlesOrderByLikes(offset, limit);
+        return ArticleDao.findPublicArticlesOrderByLikes(offset, limit);
     }
 
     public static List<Article> searchPublic(String keyword, int offset, int limit) {
         if (keyword == null || keyword.isBlank()) {
             return findPublicArticles(offset, limit);
         }
-        return ArticleDao.INSTANCE.searchPublic(keyword.trim(), offset, limit);
+        return ArticleDao.searchPublic(keyword.trim(), offset, limit);
     }
 
     /** 搜索公开文章（Servlet 层委托） */
@@ -79,7 +79,7 @@ public class ArticleService {
 
     /** 搜索公开知识库（Servlet 层委托） */
     public static List<KnowledgeBase> searchPublicKbs(String keyword) {
-        return KnowledgeBaseDao.INSTANCE.findPublicByName(keyword);
+        return KnowledgeBaseDao.findPublicByName(keyword);
     }
 
     public static void ensureArticleOwner(int articleId, int userId) {
@@ -110,14 +110,14 @@ public class ArticleService {
             return true;
         }
 
-        return KnowledgeBaseDao.INSTANCE.findById(article.getKnowledgeBaseId())
+        return KnowledgeBaseDao.findById(article.getKnowledgeBaseId())
                 .filter(kb -> kb.getOwnerType() == OwnerType.TEAM.getCode())
                 .map(kb -> isAcceptedTeamMember(kb.getOwnerId(), userId))
                 .orElse(false);
     }
 
     private static boolean hasKnowledgeBaseEditRole(int knowledgeBaseId, int userId) {
-        return KnowledgeBaseMemberDao.INSTANCE.findByKbIdAndUserId(knowledgeBaseId, userId)
+        return KnowledgeBaseMemberDao.findByKbIdAndUserId(knowledgeBaseId, userId)
                 .filter(ArticleService::isAcceptedEditorOrAbove)
                 .isPresent();
     }
@@ -128,7 +128,7 @@ public class ArticleService {
     }
 
     private static boolean isAcceptedTeamMember(int teamId, int userId) {
-        return TeamMemberDao.INSTANCE.findByTeamIdAndUserId(teamId, userId)
+        return TeamMemberDao.findByTeamIdAndUserId(teamId, userId)
                 .map(TeamMember::getJoinStatus)
                 .filter(status -> status == JoinStatus.ACCEPTED.getCode())
                 .isPresent();
@@ -150,7 +150,7 @@ public class ArticleService {
         if (summary != null) article.setSummary(summary);
         if (status != null) article.setStatus(status);
 
-        ArticleDao.INSTANCE.update(article);
+        ArticleDao.update(article);
 
         // 通知关注者：草稿 → 公开（首次发布）
         if (oldStatus == 0 && article.getStatus() == 1) {
@@ -169,7 +169,7 @@ public class ArticleService {
         ensureArticleEditable(articleId, operatorId);
         Article article = findArticleById(articleId);
         if (content != null) article.setContent(content);
-        ArticleDao.INSTANCE.update(article);
+        ArticleDao.update(article);
         return article;
     }
 
@@ -185,11 +185,11 @@ public class ArticleService {
      * 级联删除文章数据（无鉴权，仅供内部级联调用）
      */
     public static void deleteArticleData(int id) {
-        CommentDao.INSTANCE.deleteByArticleId(id);
+        CommentDao.deleteByArticleId(id);
         ArticleLikeDao.deleteByArticleId(id);
         FavoriteDao.deleteByTargetId(FavoriteDao.TYPE_ARTICLE, id);
         RecentVisitDao.deleteByArticleId(id);
-        ArticleDao.INSTANCE.deleteById(id);
+        ArticleDao.deleteById(id);
     }
 
     // ==================== VO 转换 ====================
@@ -199,48 +199,55 @@ public class ArticleService {
     }
 
     public static ArticleVO toVO(Article article, Integer userId) {
-        var author = UserDao.INSTANCE.findById(article.getAuthorId()).orElse(null);
-        var kb = KnowledgeBaseDao.INSTANCE.findById(article.getKnowledgeBaseId()).orElse(null);
-        ArticleVO vo = new ArticleVO();
-        vo.setId(article.getId());
-        vo.setKnowledgeBaseId(article.getKnowledgeBaseId());
-        vo.setTitle(article.getTitle());
-        vo.setSummary(article.getSummary());
-        vo.setContent(article.getContent());
-        vo.setContentFormat(article.getContentFormat());
-        vo.setAuthorId(article.getAuthorId());
-        vo.setAuthorName(displayName(author));
-        vo.setAuthorAvatar(author != null ? author.getAvatarUrl() : null);
-        vo.setStatus(article.getStatus());
-        vo.setCoverImage(article.getCoverImage());
-        vo.setKnowledgeBaseName(kb != null ? kb.getName() : null);
-        vo.setCreateTime(article.getCreateTime());
-        vo.setUpdateTime(article.getUpdateTime());
+        var author = UserDao.findById(article.getAuthorId()).orElse(null);
+        var kb = KnowledgeBaseDao.findById(article.getKnowledgeBaseId()).orElse(null);
 
+        String teamName = null;
+        Integer teamId = null;
         // TEAM 信息
         if (kb != null && kb.getOwnerType() == OwnerType.TEAM.getCode()) {
-            var team = TeamDao.INSTANCE.findById(kb.getOwnerId()).orElse(null);
+            var team = TeamDao.findById(kb.getOwnerId()).orElse(null);
             if (team != null) {
-                vo.setTeamName(team.getName());
-                vo.setTeamId(team.getId());
+                teamName = team.getName();
+                teamId = team.getId();
             }
         }
 
         // 计算 canEdit
-        if (userId != null) {
-            vo.setCanEdit(canUserEditArticle(article, userId));
-        } else {
-            vo.setCanEdit(false);
-        }
+        boolean canEdit = userId != null && canUserEditArticle(article, userId);
 
         // 点赞 & 收藏信息
+        Integer likeCount = null;
+        Boolean liked = null;
+        Boolean favorited = null;
         if (userId != null) {
-            vo.setLikeCount(countLikes(article.getId()));
-            vo.setLiked(isLiked(article.getId(), userId));
-            vo.setFavorited(FavoriteDao.exists(userId, FavoriteDao.TYPE_ARTICLE, article.getId()));
+            likeCount = countLikes(article.getId());
+            liked = isLiked(article.getId(), userId);
+            favorited = FavoriteDao.exists(userId, FavoriteDao.TYPE_ARTICLE, article.getId());
         }
 
-        return vo;
+        return ArticleVO.builder()
+                .id(article.getId())
+                .knowledgeBaseId(article.getKnowledgeBaseId())
+                .title(article.getTitle())
+                .summary(article.getSummary())
+                .content(article.getContent())
+                .contentFormat(article.getContentFormat())
+                .authorId(article.getAuthorId())
+                .authorName(displayName(author))
+                .authorAvatar(author != null ? author.getAvatarUrl() : null)
+                .status(article.getStatus())
+                .coverImage(article.getCoverImage())
+                .knowledgeBaseName(kb != null ? kb.getName() : null)
+                .createTime(article.getCreateTime())
+                .updateTime(article.getUpdateTime())
+                .likeCount(likeCount)
+                .liked(liked)
+                .favorited(favorited)
+                .canEdit(canEdit)
+                .teamName(teamName)
+                .teamId(teamId)
+                .build();
     }
 
     private static String displayName(User user) {
@@ -252,41 +259,38 @@ public class ArticleService {
                 : user.getUsername();
     }
 
-    private static Map<String, Object> compactArticleVO(Article article) {
-        Map<String, Object> vo = new LinkedHashMap<>();
-        vo.put("id", article.getId());
-        vo.put("title", article.getTitle());
-        vo.put("authorId", article.getAuthorId());
-        vo.put("updateTime", article.getUpdateTime());
-        return vo;
+    private static CompactArticleVO compactArticleVO(Article article) {
+        return CompactArticleVO.builder()
+                .id(article.getId())
+                .title(article.getTitle())
+                .authorId(article.getAuthorId())
+                .updateTime(article.getUpdateTime())
+                .build();
     }
 
     // ==================== 点赞 ====================
 
-    public static Map<String, Object> likeArticle(int articleId, int userId) {
+    public static LikeResultVO likeArticle(int articleId, int userId) {
         findArticleById(articleId); // 确保文章存在
         boolean inserted = ArticleLikeDao.insert(articleId, userId);
-        Map<String, Object> result = new LinkedHashMap<>();
-        result.put("liked", inserted || ArticleLikeDao.exists(articleId, userId));
-        result.put("likeCount", ArticleLikeDao.countByArticle(articleId));
 
         // 通知文章作者
         if (inserted) {
-            var article = ArticleDao.INSTANCE.findById(articleId).orElse(null);
+            var article = ArticleDao.findById(articleId).orElse(null);
             if (article != null) {
                 NotificationService.notifyLike(articleId, article.getTitle(), article.getAuthorId(), userId);
             }
         }
 
-        return result;
+        return LikeResultVO.builder()
+                .liked(inserted || ArticleLikeDao.exists(articleId, userId))
+                .likeCount(ArticleLikeDao.countByArticle(articleId))
+                .build();
     }
 
-    public static Map<String, Object> unlikeArticle(int articleId, int userId) {
+    public static LikeResultVO unlikeArticle(int articleId, int userId) {
         ArticleLikeDao.delete(articleId, userId);
-        Map<String, Object> result = new LinkedHashMap<>();
-        result.put("liked", false);
-        result.put("likeCount", ArticleLikeDao.countByArticle(articleId));
-        return result;
+        return LikeResultVO.builder().liked(false).likeCount(ArticleLikeDao.countByArticle(articleId)).build();
     }
 
     public static int countLikes(int articleId) {
@@ -308,10 +312,10 @@ public class ArticleService {
         comment.setReplyToId(replyToId);
         comment.setContent(content);
         comment.setCreateTime(LocalDateTime.now());
-        CommentDao.INSTANCE.insert(comment);
+        CommentDao.insert(comment);
 
         // 通知文章作者
-        var article = ArticleDao.INSTANCE.findById(articleId).orElse(null);
+        var article = ArticleDao.findById(articleId).orElse(null);
         if (article != null) {
             NotificationService.notifyComment(articleId, article.getTitle(), article.getAuthorId(), userId);
         }
@@ -319,41 +323,41 @@ public class ArticleService {
         return comment.getId();
     }
 
-    public static List<Map<String, Object>> listComments(int articleId) {
-        var comments = CommentDao.INSTANCE.findByArticleId(articleId);
-        List<Map<String, Object>> voList = new java.util.ArrayList<>();
+    public static List<CommentVO> listComments(int articleId) {
+        var comments = CommentDao.findByArticleId(articleId);
+        List<CommentVO> voList = new java.util.ArrayList<>();
         for (Comment c : comments) {
-            var author = UserDao.INSTANCE.findById(c.getUserId()).orElse(null);
-            var replyToUser = c.getReplyToId() != null ? UserDao.INSTANCE.findById(
-                    CommentDao.INSTANCE.findById(c.getReplyToId()).map(Comment::getUserId).orElse(0)
+            var author = UserDao.findById(c.getUserId()).orElse(null);
+            var replyToUser = c.getReplyToId() != null ? UserDao.findById(
+                    CommentDao.findById(c.getReplyToId()).map(Comment::getUserId).orElse(0)
             ).orElse(null) : null;
 
-            Map<String, Object> vo = new LinkedHashMap<>();
-            vo.put("id", c.getId());
-            vo.put("articleId", c.getArticleId());
-            vo.put("userId", c.getUserId());
-            vo.put("username", author != null ? author.getUsername() : null);
-            vo.put("nickname", author != null ? author.getNickname() : null);
-            vo.put("avatarUrl", author != null ? author.getAvatarUrl() : null);
-            vo.put("parentId", c.getParentId());
-            vo.put("replyToId", c.getReplyToId());
-            vo.put("replyToNickname", replyToUser != null ? replyToUser.getNickname() : null);
-            vo.put("content", c.getContent());
-            vo.put("createTime", c.getCreateTime() != null ? c.getCreateTime().toString() : null);
-            voList.add(vo);
+            voList.add(CommentVO.builder()
+                    .id(c.getId())
+                    .articleId(c.getArticleId())
+                    .userId(c.getUserId())
+                    .username(author != null ? author.getUsername() : null)
+                    .nickname(author != null ? author.getNickname() : null)
+                    .avatarUrl(author != null ? author.getAvatarUrl() : null)
+                    .parentId(c.getParentId())
+                    .replyToId(c.getReplyToId())
+                    .replyToNickname(replyToUser != null ? replyToUser.getNickname() : null)
+                    .content(c.getContent())
+                    .createTime(c.getCreateTime() != null ? c.getCreateTime().toString() : null)
+                    .build());
         }
         return voList;
     }
 
     public static void deleteComment(int commentId, int userId) {
-        Comment comment = CommentDao.INSTANCE.findById(commentId)
+        Comment comment = CommentDao.findById(commentId)
                 .orElseThrow(() -> new ArticleException(ArticleError.COMMENT_NOT_FOUND));
         // 只能删自己的评论（或文章作者可删）
-        Article article = ArticleDao.INSTANCE.findById(comment.getArticleId()).orElse(null);
+        Article article = ArticleDao.findById(comment.getArticleId()).orElse(null);
         if (comment.getUserId() != userId && (article == null || article.getAuthorId() != userId)) {
             throw new ArticleException(ArticleError.CANNOT_DELETE_OTHERS_COMMENT);
         }
-        CommentDao.INSTANCE.deleteById(commentId);
+        CommentDao.deleteById(commentId);
     }
 
     // ==================== 收藏 ====================
@@ -371,25 +375,29 @@ public class ArticleService {
     }
 
     /** 构建收藏文章 VO 列表 */
-    public static List<Map<String, Object>> buildFavoriteVOList(int userId) {
+    public static List<CompactArticleVO> buildFavoriteVOList(int userId) {
         List<Integer> articleIds = findFavoriteArticleIds(userId);
-        List<Map<String, Object>> voList = new java.util.ArrayList<>();
+        List<CompactArticleVO> voList = new java.util.ArrayList<>();
         for (int aid : articleIds) {
-            var article = ArticleDao.INSTANCE.findById(aid).orElse(null);
+            var article = ArticleDao.findById(aid).orElse(null);
             if (article == null) continue;
-            Map<String, Object> vo = compactArticleVO(article);
-            vo.put("createTime", article.getCreateTime());
-            voList.add(vo);
+            voList.add(CompactArticleVO.builder()
+                    .id(article.getId())
+                    .title(article.getTitle())
+                    .authorId(article.getAuthorId())
+                    .updateTime(article.getUpdateTime())
+                    .createTime(article.getCreateTime())
+                    .build());
         }
         return voList;
     }
 
     /** 构建浏览历史 VO 列表 */
-    public static List<Map<String, Object>> buildHistoryVOList(int userId, int limit) {
+    public static List<CompactArticleVO> buildHistoryVOList(int userId, int limit) {
         List<Integer> articleIds = findRecentArticleIds(userId, limit);
-        List<Map<String, Object>> voList = new java.util.ArrayList<>();
+        List<CompactArticleVO> voList = new java.util.ArrayList<>();
         for (int aid : articleIds) {
-            var article = ArticleDao.INSTANCE.findById(aid).orElse(null);
+            var article = ArticleDao.findById(aid).orElse(null);
             if (article == null) continue;
             voList.add(compactArticleVO(article));
         }

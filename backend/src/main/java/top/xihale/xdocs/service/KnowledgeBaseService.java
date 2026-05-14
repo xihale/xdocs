@@ -9,15 +9,13 @@ import top.xihale.xdocs.exception.KbException.KbError;
 import top.xihale.xdocs.po.KnowledgeBase;
 import top.xihale.xdocs.po.KnowledgeBaseMember;
 import top.xihale.xdocs.po.User;
-import top.xihale.xdocs.service.NotificationService;
-import top.xihale.xdocs.util.SqlBuilder;
-
+import top.xihale.xdocs.util.Db;
+import top.xihale.xdocs.vo.KbMemberVO;
+import top.xihale.xdocs.vo.KbPendingInviteVO;
 import top.xihale.xdocs.vo.KnowledgeBaseVO;
 
 import java.util.ArrayList;
-import java.util.LinkedHashMap;
 import java.util.List;
-import java.util.Map;
 
 /**
  * 知识库业务逻辑层
@@ -27,14 +25,14 @@ public class KnowledgeBaseService {
     public static KnowledgeBase createKnowledgeBase(String name, String description, int visibility, int ownerType, int ownerId, int creatorId) {
         // 创建 TEAM 知识库时，校验操作者是 TEAM 成员
         if (ownerType == OwnerType.TEAM.getCode()) {
-            TeamMemberDao.INSTANCE.findByTeamIdAndUserId(ownerId, creatorId)
+            TeamMemberDao.findByTeamIdAndUserId(ownerId, creatorId)
                     .filter(m -> m.getJoinStatus() == JoinStatus.ACCEPTED.getCode())
                     .orElseThrow(() -> new KbException(KbError.NOT_TEAM_MEMBER));
         }
 
-        return SqlBuilder.inTransaction(conn -> {
+        return Db.inTransaction(conn -> {
             KnowledgeBase kb = new KnowledgeBase(name, description, visibility, ownerType, ownerId, creatorId);
-            KnowledgeBaseDao.INSTANCE.insert(kb);
+            KnowledgeBaseDao.insert(kb);
 
             // 自动将创建者添加为 OWNER 成员
             KnowledgeBaseMember member = new KnowledgeBaseMember(
@@ -43,19 +41,19 @@ public class KnowledgeBaseService {
                     JoinStatus.ACCEPTED.getCode(),
                     creatorId
             );
-            KnowledgeBaseMemberDao.INSTANCE.insert(member);
+            KnowledgeBaseMemberDao.insert(member);
 
             return kb;
         });
     }
 
     public static KnowledgeBase findKnowledgeBaseById(int id) {
-        return KnowledgeBaseDao.INSTANCE.findById(id)
+        return KnowledgeBaseDao.findById(id)
                 .orElseThrow(() -> new KbException(KbError.KB_NOT_FOUND));
     }
 
     public static List<KnowledgeBase> findByOwner(int ownerType, int ownerId) {
-        return KnowledgeBaseDao.INSTANCE.findByOwnerId(ownerType, ownerId);
+        return KnowledgeBaseDao.findByOwnerId(ownerType, ownerId);
     }
 
     public static void updateKnowledgeBase(int kbId, String name, String description, int operatorId) {
@@ -63,23 +61,23 @@ public class KnowledgeBaseService {
         KnowledgeBase kb = findKnowledgeBaseById(kbId);
         if (name != null) kb.setName(name);
         if (description != null) kb.setDescription(description);
-        KnowledgeBaseDao.INSTANCE.update(kb);
+        KnowledgeBaseDao.update(kb);
     }
 
     public static void deleteKnowledgeBase(int kbId, int operatorId) {
         ensureKbPermission(kbId, operatorId, KnowledgeBaseRole.OWNER);
         // 级联删除：成员 → 文章（含评论、点赞、收藏、浏览记录） → 知识库
-        KnowledgeBaseMemberDao.INSTANCE.deleteByKbId(kbId);
-        var articles = ArticleDao.INSTANCE.findByKnowledgeBaseId(kbId);
+        KnowledgeBaseMemberDao.deleteByKbId(kbId);
+        var articles = ArticleDao.findByKnowledgeBaseId(kbId);
         for (var article : articles) {
             ArticleService.deleteArticleData(article.getId());
         }
-        KnowledgeBaseDao.INSTANCE.deleteById(kbId);
+        KnowledgeBaseDao.deleteById(kbId);
     }
 
     private static void ensureKbPermission(int kbId, int userId, KnowledgeBaseRole... requiredRoles) {
         findKnowledgeBaseById(kbId);
-        KnowledgeBaseMember member = KnowledgeBaseMemberDao.INSTANCE.findByKbIdAndUserId(kbId, userId)
+        KnowledgeBaseMember member = KnowledgeBaseMemberDao.findByKbIdAndUserId(kbId, userId)
                 .orElseThrow(() -> new KbException(KbError.NOT_KB_MEMBER));
         for (KnowledgeBaseRole required : requiredRoles) {
             if (member.getRole() == required.getCode()) return;
@@ -92,7 +90,7 @@ public class KnowledgeBaseService {
         findKnowledgeBaseById(kbId);
 
         // 校验操作者是知识库的 OWNER 或 ADMIN
-        KnowledgeBaseMember operator = KnowledgeBaseMemberDao.INSTANCE.findByKbIdAndUserId(kbId, inviterId)
+        KnowledgeBaseMember operator = KnowledgeBaseMemberDao.findByKbIdAndUserId(kbId, inviterId)
                 .orElseThrow(() -> new KbException(KbError.NOT_KB_MEMBER));
         if (operator.getRole() != KnowledgeBaseRole.OWNER.getCode()
                 && operator.getRole() != KnowledgeBaseRole.ADMIN.getCode()) {
@@ -100,11 +98,11 @@ public class KnowledgeBaseService {
         }
 
         // 查看是否已有成员记录
-        KnowledgeBaseMember existing = KnowledgeBaseMemberDao.INSTANCE.findByKbIdAndUserId(kbId, userId).orElse(null);
+        KnowledgeBaseMember existing = KnowledgeBaseMemberDao.findByKbIdAndUserId(kbId, userId).orElse(null);
 
         if (existing != null) {
             // 已有成员记录，更新角色
-            KnowledgeBaseMemberDao.INSTANCE.updateRole(kbId, userId, role);
+            KnowledgeBaseMemberDao.updateRole(kbId, userId, role);
         } else {
             // 没有成员记录，创建新成员
             KnowledgeBaseMember member = new KnowledgeBaseMember(
@@ -112,10 +110,10 @@ public class KnowledgeBaseService {
                     JoinStatus.INVITED.getCode(),
                     inviterId
             );
-            KnowledgeBaseMemberDao.INSTANCE.insert(member);
+            KnowledgeBaseMemberDao.insert(member);
 
             // 发送知识库邀请通知
-            var kb = KnowledgeBaseDao.INSTANCE.findById(kbId).orElse(null);
+            var kb = KnowledgeBaseDao.findById(kbId).orElse(null);
             NotificationService.notifyKbInvite(kbId,
                     kb != null ? kb.getName() : "未知知识库",
                     userId, inviterId);
@@ -128,23 +126,23 @@ public class KnowledgeBaseService {
     public static void removeMember(int kbId, int userId, int operatorId) {
         findKnowledgeBaseById(kbId);
 
-        KnowledgeBaseMember operator = KnowledgeBaseMemberDao.INSTANCE.findByKbIdAndUserId(kbId, operatorId)
+        KnowledgeBaseMember operator = KnowledgeBaseMemberDao.findByKbIdAndUserId(kbId, operatorId)
                 .orElseThrow(() -> new KbException(KbError.NOT_KB_MEMBER));
         if (operator.getRole() != KnowledgeBaseRole.OWNER.getCode()
                 && operator.getRole() != KnowledgeBaseRole.ADMIN.getCode()) {
             throw new KbException(KbError.REMOVE_REQUIRES_OWNER_OR_ADMIN);
         }
 
-        KnowledgeBaseMember target = KnowledgeBaseMemberDao.INSTANCE.findByKbIdAndUserId(kbId, userId)
+        KnowledgeBaseMember target = KnowledgeBaseMemberDao.findByKbIdAndUserId(kbId, userId)
                 .orElseThrow(() -> new KbException(KbError.TARGET_NOT_KB_MEMBER));
         if (target.getRole() == KnowledgeBaseRole.OWNER.getCode()) {
             throw new KbException(KbError.CANNOT_REMOVE_KB_OWNER);
         }
-        KnowledgeBaseMemberDao.INSTANCE.delete(kbId, userId);
+        KnowledgeBaseMemberDao.delete(kbId, userId);
 
         // 通知被移除的用户
-        var kb = KnowledgeBaseDao.INSTANCE.findById(kbId).orElse(null);
-        String operatorName = UserDao.INSTANCE.findById(operatorId)
+        var kb = KnowledgeBaseDao.findById(kbId).orElse(null);
+        String operatorName = UserDao.findById(operatorId)
                 .map(u -> u.getNickname() != null ? u.getNickname() : u.getUsername())
                 .orElse("未知用户");
         NotificationService.notifyMemberChange(userId,
@@ -157,17 +155,17 @@ public class KnowledgeBaseService {
      * 接受知识库邀请
      */
     public static void acceptInvite(int kbId, int userId) {
-        KnowledgeBaseMember member = KnowledgeBaseMemberDao.INSTANCE.findByKbIdAndUserId(kbId, userId)
+        KnowledgeBaseMember member = KnowledgeBaseMemberDao.findByKbIdAndUserId(kbId, userId)
                 .orElseThrow(() -> new KbException(KbError.KB_INVITE_NOT_FOUND));
         if (member.getInviteStatus() != JoinStatus.INVITED.getCode()) {
             throw new KbException(KbError.KB_INVITE_STATUS_NOT_PENDING);
         }
-        KnowledgeBaseMemberDao.INSTANCE.updateInviteStatus(kbId, userId, JoinStatus.ACCEPTED.getCode());
+        KnowledgeBaseMemberDao.updateInviteStatus(kbId, userId, JoinStatus.ACCEPTED.getCode());
 
         // 通知邀请者
         if (member.getInviteBy() != null) {
-            var kb = KnowledgeBaseDao.INSTANCE.findById(kbId).orElse(null);
-            String userName = UserDao.INSTANCE.findById(userId)
+            var kb = KnowledgeBaseDao.findById(kbId).orElse(null);
+            String userName = UserDao.findById(userId)
                     .map(u -> u.getNickname() != null ? u.getNickname() : u.getUsername())
                     .orElse("未知用户");
             NotificationService.notifyMemberChange(member.getInviteBy(),
@@ -181,12 +179,12 @@ public class KnowledgeBaseService {
      * 拒绝知识库邀请
      */
     public static void rejectInvite(int kbId, int userId) {
-        KnowledgeBaseMember member = KnowledgeBaseMemberDao.INSTANCE.findByKbIdAndUserId(kbId, userId)
+        KnowledgeBaseMember member = KnowledgeBaseMemberDao.findByKbIdAndUserId(kbId, userId)
                 .orElseThrow(() -> new KbException(KbError.KB_INVITE_NOT_FOUND));
         if (member.getInviteStatus() != JoinStatus.INVITED.getCode()) {
             throw new KbException(KbError.KB_INVITE_STATUS_NOT_PENDING);
         }
-        KnowledgeBaseMemberDao.INSTANCE.updateInviteStatus(kbId, userId, JoinStatus.REJECTED.getCode());
+        KnowledgeBaseMemberDao.updateInviteStatus(kbId, userId, JoinStatus.REJECTED.getCode());
     }
 
     /**
@@ -195,19 +193,19 @@ public class KnowledgeBaseService {
     public static void cancelInvite(int kbId, int userId, int operatorId) {
         findKnowledgeBaseById(kbId);
 
-        KnowledgeBaseMember operator = KnowledgeBaseMemberDao.INSTANCE.findByKbIdAndUserId(kbId, operatorId)
+        KnowledgeBaseMember operator = KnowledgeBaseMemberDao.findByKbIdAndUserId(kbId, operatorId)
                 .orElseThrow(() -> new KbException(KbError.NOT_KB_MEMBER));
         if (operator.getRole() != KnowledgeBaseRole.OWNER.getCode()
                 && operator.getRole() != KnowledgeBaseRole.ADMIN.getCode()) {
             throw new KbException(KbError.CANCEL_KB_INVITE_REQUIRES_OWNER_OR_ADMIN);
         }
 
-        KnowledgeBaseMember target = KnowledgeBaseMemberDao.INSTANCE.findByKbIdAndUserId(kbId, userId)
+        KnowledgeBaseMember target = KnowledgeBaseMemberDao.findByKbIdAndUserId(kbId, userId)
                 .orElseThrow(() -> new KbException(KbError.KB_INVITE_NOT_FOUND));
         if (target.getInviteStatus() != JoinStatus.INVITED.getCode()) {
             throw new KbException(KbError.NO_PENDING_KB_INVITE);
         }
-        KnowledgeBaseMemberDao.INSTANCE.delete(kbId, userId);
+        KnowledgeBaseMemberDao.delete(kbId, userId);
     }
 
     /**
@@ -216,49 +214,52 @@ public class KnowledgeBaseService {
     public static void updateMemberRole(int kbId, int userId, int role, int operatorId) {
         findKnowledgeBaseById(kbId);
 
-        KnowledgeBaseMember operator = KnowledgeBaseMemberDao.INSTANCE.findByKbIdAndUserId(kbId, operatorId)
+        KnowledgeBaseMember operator = KnowledgeBaseMemberDao.findByKbIdAndUserId(kbId, operatorId)
                 .orElseThrow(() -> new KbException(KbError.NOT_KB_MEMBER));
         if (operator.getRole() != KnowledgeBaseRole.OWNER.getCode()) {
             throw new KbException(KbError.KB_ROLE_CHANGE_REQUIRES_OWNER);
         }
 
-        KnowledgeBaseMember target = KnowledgeBaseMemberDao.INSTANCE.findByKbIdAndUserId(kbId, userId)
+        KnowledgeBaseMember target = KnowledgeBaseMemberDao.findByKbIdAndUserId(kbId, userId)
                 .orElseThrow(() -> new KbException(KbError.KB_TARGET_MEMBER_NOT_FOUND));
         if (target.getRole() == KnowledgeBaseRole.OWNER.getCode()) {
             throw new KbException(KbError.CANNOT_CHANGE_KB_OWNER_ROLE);
         }
-        KnowledgeBaseMemberDao.INSTANCE.updateRole(kbId, userId, role);
+        KnowledgeBaseMemberDao.updateRole(kbId, userId, role);
     }
 
     // ==================== VO 转换 ====================
 
     public static KnowledgeBaseVO toVO(KnowledgeBase kb) {
-        User creator = UserDao.INSTANCE.findById(kb.getCreatorId()).orElse(null);
-        int articleCount = ArticleDao.INSTANCE.findByKnowledgeBaseId(kb.getId()).size();
-
-        KnowledgeBaseVO vo = new KnowledgeBaseVO();
-        vo.setId(kb.getId());
-        vo.setName(kb.getName());
-        vo.setDescription(kb.getDescription());
-        vo.setVisibility(kb.getVisibility());
-        vo.setOwnerType(kb.getOwnerType());
-        vo.setOwnerId(kb.getOwnerId());
+        User creator = UserDao.findById(kb.getCreatorId()).orElse(null);
+        int articleCount = ArticleDao.findByKnowledgeBaseId(kb.getId()).size();
 
         // ownerName
+        String ownerName;
         if (kb.getOwnerType() == OwnerType.TEAM.getCode()) {
-            var team = TeamDao.INSTANCE.findById(kb.getOwnerId()).orElse(null);
-            vo.setOwnerName(team != null ? team.getName() : null);
+            var team = TeamDao.findById(kb.getOwnerId()).orElse(null);
+            ownerName = team != null ? team.getName() : null;
         } else {
-            User owner = UserDao.INSTANCE.findById(kb.getOwnerId()).orElse(null);
-            vo.setOwnerName(owner != null ? (owner.getNickname() != null ? owner.getNickname() : owner.getUsername()) : null);
+            User owner = UserDao.findById(kb.getOwnerId()).orElse(null);
+            ownerName = owner != null ? (owner.getNickname() != null ? owner.getNickname() : owner.getUsername()) : null;
         }
 
-        vo.setCreatorId(kb.getCreatorId());
-        vo.setCreatorName(creator != null ? (creator.getNickname() != null ? creator.getNickname() : creator.getUsername()) : null);
-        vo.setArticleCount(articleCount);
-        vo.setCreateTime(kb.getCreateTime());
-        vo.setUpdateTime(kb.getUpdateTime());
-        return vo;
+        String creatorName = creator != null ? (creator.getNickname() != null ? creator.getNickname() : creator.getUsername()) : null;
+
+        return KnowledgeBaseVO.builder()
+                .id(kb.getId())
+                .name(kb.getName())
+                .description(kb.getDescription())
+                .visibility(kb.getVisibility())
+                .ownerType(kb.getOwnerType())
+                .ownerId(kb.getOwnerId())
+                .ownerName(ownerName)
+                .creatorId(kb.getCreatorId())
+                .creatorName(creatorName)
+                .articleCount(articleCount)
+                .createTime(kb.getCreateTime())
+                .updateTime(kb.getUpdateTime())
+                .build();
     }
 
     public static List<KnowledgeBaseVO> toVOList(List<KnowledgeBase> list) {
@@ -271,49 +272,50 @@ public class KnowledgeBaseService {
 
     // ==================== 查询辅助 ====================
 
-    public static List<Map<String, Object>> buildMemberVOList(int kbId) {
-        var members = KnowledgeBaseMemberDao.INSTANCE.findByKbId(kbId);
-        List<Map<String, Object>> accepted = new ArrayList<>();
-        List<Map<String, Object>> invited = new ArrayList<>();
+    public static List<KbMemberVO> buildMemberVOList(int kbId) {
+        var members = KnowledgeBaseMemberDao.findByKbId(kbId);
+        List<KbMemberVO> accepted = new ArrayList<>();
+        List<KbMemberVO> invited = new ArrayList<>();
         for (var m : members) {
             if (m.getInviteStatus() == JoinStatus.REJECTED.getCode()) continue;
-            var user = UserDao.INSTANCE.findById(m.getUserId()).orElse(null);
-            Map<String, Object> item = new LinkedHashMap<>();
-            item.put("id", m.getId());
-            item.put("kbId", m.getKnowledgeBaseId());
-            item.put("userId", m.getUserId());
-            item.put("username", user != null ? user.getUsername() : null);
-            item.put("nickname", user != null ? user.getNickname() : null);
-            item.put("avatarUrl", user != null ? user.getAvatarUrl() : null);
-            item.put("role", m.getRole());
-            item.put("roleName", KnowledgeBaseRole.fromCode(m.getRole()).name());
-            item.put("inviteStatus", m.getInviteStatus());
-            item.put("joinTime", m.getJoinTime());
+            var user = UserDao.findById(m.getUserId()).orElse(null);
+            KbMemberVO vo = KbMemberVO.builder()
+                    .id(m.getId())
+                    .kbId(m.getKnowledgeBaseId())
+                    .userId(m.getUserId())
+                    .username(user != null ? user.getUsername() : null)
+                    .nickname(user != null ? user.getNickname() : null)
+                    .avatarUrl(user != null ? user.getAvatarUrl() : null)
+                    .role(m.getRole())
+                    .roleName(KnowledgeBaseRole.fromCode(m.getRole()).name())
+                    .inviteStatus(m.getInviteStatus())
+                    .joinTime(m.getJoinTime())
+                    .build();
             if (m.getInviteStatus() == JoinStatus.ACCEPTED.getCode()) {
-                accepted.add(item);
+                accepted.add(vo);
             } else if (m.getInviteStatus() == JoinStatus.INVITED.getCode()) {
-                invited.add(item);
+                invited.add(vo);
             }
         }
         // 已接受在前，待邀请在后
-        List<Map<String, Object>> result = new ArrayList<>(accepted);
+        List<KbMemberVO> result = new ArrayList<>(accepted);
         result.addAll(invited);
         return result;
     }
 
-    public static List<Map<String, Object>> buildPendingInviteList(int userId) {
-        List<KnowledgeBaseMember> pending = KnowledgeBaseMemberDao.INSTANCE.findPendingByUserId(userId);
-        List<Map<String, Object>> result = new ArrayList<>();
+    public static List<KbPendingInviteVO> buildPendingInviteList(int userId) {
+        List<KnowledgeBaseMember> pending = KnowledgeBaseMemberDao.findPendingByUserId(userId);
+        List<KbPendingInviteVO> result = new ArrayList<>();
         for (KnowledgeBaseMember member : pending) {
-            var kb = KnowledgeBaseDao.INSTANCE.findById(member.getKnowledgeBaseId()).orElse(null);
-            Map<String, Object> item = new LinkedHashMap<>();
-            item.put("id", member.getId());
-            item.put("kbId", member.getKnowledgeBaseId());
-            item.put("kbName", kb != null ? kb.getName() : null);
-            item.put("role", member.getRole());
-            item.put("inviteStatus", member.getInviteStatus());
-            item.put("joinTime", member.getJoinTime());
-            result.add(item);
+            var kb = KnowledgeBaseDao.findById(member.getKnowledgeBaseId()).orElse(null);
+            result.add(KbPendingInviteVO.builder()
+                    .id(member.getId())
+                    .kbId(member.getKnowledgeBaseId())
+                    .kbName(kb != null ? kb.getName() : null)
+                    .role(member.getRole())
+                    .inviteStatus(member.getInviteStatus())
+                    .joinTime(member.getJoinTime())
+                    .build());
         }
         return result;
     }

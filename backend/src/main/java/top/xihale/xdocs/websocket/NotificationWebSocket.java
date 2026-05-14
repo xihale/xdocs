@@ -3,6 +3,7 @@ package top.xihale.xdocs.websocket;
 import jakarta.websocket.*;
 import jakarta.websocket.server.ServerEndpoint;
 import top.xihale.xdocs.util.JsonUtils;
+import top.xihale.xdocs.vo.NotificationVO;
 
 import java.io.IOException;
 import java.util.*;
@@ -82,14 +83,12 @@ public class NotificationWebSocket extends BaseWebSocket {
     /**
      * 向指定用户推送通知
      */
-    public void sendToUser(int userId, Map<String, Object> notificationData) {
+    public void sendToUser(int userId, NotificationVO notificationData) {
         Set<Session> sessions = userSessions.get(userId);
         if (sessions == null || sessions.isEmpty()) return;
 
-        Map<String, Object> message = new LinkedHashMap<>();
-        message.put("type", "notification");
-        message.put("data", notificationData);
-        String json = JsonUtils.toJson(message);
+        record NotificationMessage(String type, NotificationVO data) {}
+        String json = JsonUtils.toJson(new NotificationMessage("notification", notificationData));
 
         for (Session s : sessions) {
             if (s.isOpen()) {
@@ -109,10 +108,8 @@ public class NotificationWebSocket extends BaseWebSocket {
         Set<Session> sessions = userSessions.get(userId);
         if (sessions == null || sessions.isEmpty()) return;
 
-        Map<String, Object> message = new LinkedHashMap<>();
-        message.put("type", "unread_count");
-        message.put("count", count);
-        String json = JsonUtils.toJson(message);
+        record UnreadCountMessage(String type, int count) {}
+        String json = JsonUtils.toJson(new UnreadCountMessage("unread_count", count));
 
         for (Session s : sessions) {
             if (s.isOpen()) {

@@ -8,7 +8,6 @@ import top.xihale.xdocs.exception.UserException;
 import top.xihale.xdocs.exception.UserException.UserError;
 import top.xihale.xdocs.po.User;
 import top.xihale.xdocs.util.PasswordUtils;
-import top.xihale.xdocs.service.NotificationService;
 import top.xihale.xdocs.vo.UserVO;
 
 import java.util.ArrayList;
@@ -23,22 +22,22 @@ public class UserService {
     // ==================== 认证相关 ====================
 
     public static User register(String username, String password, String email, String nickname) {
-        if (UserDao.INSTANCE.findByUsername(username).isPresent()) {
+        if (UserDao.findByUsername(username).isPresent()) {
             throw new UserException(UserError.USERNAME_EXISTS);
         }
-        if (UserDao.INSTANCE.findByEmail(email).isPresent()) {
+        if (UserDao.findByEmail(email).isPresent()) {
             throw new UserException(UserError.EMAIL_EXISTS);
         }
 
         var user = new User(username, PasswordUtils.hash(password), email);
         user.setNickname(nickname != null ? nickname : username);
-        UserDao.INSTANCE.insert(user);
+        UserDao.insert(user);
 
         return user;
     }
 
     public static User login(String username, String password) {
-        var user = UserDao.INSTANCE.findByUsername(username)
+        var user = UserDao.findByUsername(username)
                 .orElseThrow(() -> new UserException(UserError.LOGIN_FAILED));
 
         if (!PasswordUtils.verify(password, user.getPassword())) {
@@ -53,63 +52,63 @@ public class UserService {
     // ==================== 用户操作 ====================
 
     public static void update(User user) {
-        UserDao.INSTANCE.update(user);
+        UserDao.update(user);
     }
 
     public static void updateNickname(int id, String nickname) {
-        UserDao.INSTANCE.updateNickname(id, nickname);
+        UserDao.updateNickname(id, nickname);
     }
 
     public static void changePassword(int id, String oldPass, String newPass) {
-        var user = UserDao.INSTANCE.findById(id)
+        var user = UserDao.findById(id)
                 .orElseThrow(() -> new UserException(UserError.USER_NOT_FOUND));
         if (!PasswordUtils.verify(oldPass, user.getPassword())) {
             throw new UserException(UserError.OLD_PASSWORD_WRONG);
         }
-        UserDao.INSTANCE.updatePassword(id, PasswordUtils.hash(newPass));
+        UserDao.updatePassword(id, PasswordUtils.hash(newPass));
     }
 
     public static void resetPassword(String email, String newPassword) {
-        var user = UserDao.INSTANCE.findByEmail(email)
+        var user = UserDao.findByEmail(email)
                 .orElseThrow(() -> new UserException(UserError.EMAIL_NOT_REGISTERED));
-        UserDao.INSTANCE.updatePassword(user.getId(), PasswordUtils.hash(newPassword));
+        UserDao.updatePassword(user.getId(), PasswordUtils.hash(newPassword));
     }
 
     public static void updateAvatar(int id, String avatarUrl) {
-        UserDao.INSTANCE.updateAvatar(id, avatarUrl);
+        UserDao.updateAvatar(id, avatarUrl);
     }
 
     // ==================== 查询相关 ====================
 
     public static User findUserByUsername(String username) {
-        return UserDao.INSTANCE.findByUsername(username)
+        return UserDao.findByUsername(username)
                 .orElseThrow(() -> new UserException(UserError.USERNAME_NOT_FOUND));
     }
 
     public static User findUserById(int id) {
-        return UserDao.INSTANCE.findById(id)
+        return UserDao.findById(id)
                 .orElseThrow(() -> new UserException(UserError.USER_NOT_FOUND));
     }
 
     public static Optional<User> findUserByIdOptional(int id) {
-        return UserDao.INSTANCE.findById(id);
+        return UserDao.findById(id);
     }
 
     public static boolean emailExists(String email) {
-        return UserDao.INSTANCE.findByEmail(email).isPresent();
+        return UserDao.findByEmail(email).isPresent();
     }
 
     public static boolean emailNotExists(String email) {
-        return UserDao.INSTANCE.findByEmail(email).isEmpty();
+        return UserDao.findByEmail(email).isEmpty();
     }
 
     public static List<UserVO> findAll() {
-        List<User> users = UserDao.INSTANCE.findAll();
+        List<User> users = UserDao.findAll();
         return users.stream().map(User::toVO).toList();
     }
 
     public static List<User> searchByKeyword(String keyword) {
-        return UserDao.INSTANCE.searchByKeyword(keyword);
+        return UserDao.searchByKeyword(keyword);
     }
 
     // ==================== VO 构建 ====================
@@ -119,21 +118,21 @@ public class UserService {
      */
     public static UserVO buildUserProfile(int userId, Integer currentUserId) {
         User user = findUserById(userId);
-        UserVO vo = new UserVO();
-        vo.setId(user.getId());
-        vo.setUsername(user.getUsername());
-        vo.setEmail(user.getEmail());
-        vo.setNickname(user.getNickname());
-        vo.setAvatarUrl(user.getAvatarUrl());
-        vo.setRole(user.getRole());
-        vo.setStatus(user.getStatus());
-        vo.setCreateTime(user.getCreateTime());
-        vo.setUpdateTime(user.getUpdateTime());
-        vo.setFollowingCount(countFollowing(userId));
-        vo.setFollowerCount(countFollowers(userId));
-        vo.setIsFollowed(currentUserId != null && !currentUserId.equals(userId)
-                ? isFollowing(currentUserId, userId) : false);
-        return vo;
+        return UserVO.builder()
+                .id(user.getId())
+                .username(user.getUsername())
+                .nickname(user.getNickname())
+                .email(user.getEmail())
+                .avatarUrl(user.getAvatarUrl())
+                .role(user.getRole())
+                .status(user.getStatus())
+                .createTime(user.getCreateTime())
+                .updateTime(user.getUpdateTime())
+                .followingCount(countFollowing(userId))
+                .followerCount(countFollowers(userId))
+                .isFollowed(currentUserId != null && !currentUserId.equals(userId)
+                        && isFollowing(currentUserId, userId))
+                .build();
     }
 
     /**
@@ -142,14 +141,14 @@ public class UserService {
     public static List<UserVO> buildUserVOList(List<Integer> ids) {
         List<UserVO> voList = new ArrayList<>();
         for (int id : ids) {
-            var user = UserDao.INSTANCE.findById(id).orElse(null);
+            var user = UserDao.findById(id).orElse(null);
             if (user == null) continue;
-            UserVO vo = new UserVO();
-            vo.setId(user.getId());
-            vo.setUsername(user.getUsername());
-            vo.setNickname(user.getNickname());
-            vo.setAvatarUrl(user.getAvatarUrl());
-            voList.add(vo);
+            voList.add(UserVO.builder()
+                    .id(user.getId())
+                    .username(user.getUsername())
+                    .nickname(user.getNickname())
+                    .avatarUrl(user.getAvatarUrl())
+                    .build());
         }
         return voList;
     }
@@ -189,13 +188,13 @@ public class UserService {
     }
 
     public static void ensureEmailAvailableForRegister(String email) {
-        if (UserDao.INSTANCE.findByEmail(email).isPresent()) {
+        if (UserDao.findByEmail(email).isPresent()) {
             throw new UserException(UserError.EMAIL_EXISTS);
         }
     }
 
     public static void ensureEmailRegisteredForReset(String email) {
-        if (UserDao.INSTANCE.findByEmail(email).isEmpty()) {
+        if (UserDao.findByEmail(email).isEmpty()) {
             throw new UserException(UserError.EMAIL_NOT_REGISTERED);
         }
     }
