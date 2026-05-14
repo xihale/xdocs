@@ -25,6 +25,9 @@ import java.security.SecureRandom;
 import java.time.Instant;
 import java.util.Map;
 import java.util.concurrent.ConcurrentHashMap;
+import java.util.concurrent.Executors;
+import java.util.concurrent.ScheduledExecutorService;
+import java.util.concurrent.TimeUnit;
 
 /**
  * 认证相关接口
@@ -33,6 +36,20 @@ import java.util.concurrent.ConcurrentHashMap;
 public class AuthServlet extends BaseServlet {
     private static final long EMAIL_CODE_SEND_INTERVAL_SECONDS = 60;
     private static final ConcurrentHashMap<String, Long> emailCodeLastSentAtMap = new ConcurrentHashMap<>();
+
+    static {
+        // 后台定时清理过期限流记录，每 5 分钟执行一次
+        ScheduledExecutorService cleaner = Executors.newSingleThreadScheduledExecutor(r -> {
+            Thread t = new Thread(r, "email-rate-limit-cleaner");
+            t.setDaemon(true);
+            return t;
+        });
+        long interval = EMAIL_CODE_SEND_INTERVAL_SECONDS * 5;
+        cleaner.scheduleAtFixedRate(() -> {
+            long now = Instant.now().getEpochSecond();
+            emailCodeLastSentAtMap.entrySet().removeIf(e -> now - e.getValue() >= EMAIL_CODE_SEND_INTERVAL_SECONDS);
+        }, interval, interval, TimeUnit.SECONDS);
+    }
 
     @Public
     @Post("/register")
@@ -121,6 +138,7 @@ public class AuthServlet extends BaseServlet {
         HttpSession session = req.getSession();
         long now = Instant.now().getEpochSecond();
         String rateLimitKey = type + ":" + email.toLowerCase();
+
         Long lastSentAt = emailCodeLastSentAtMap.get(rateLimitKey);
         if (lastSentAt != null && now - lastSentAt < EMAIL_CODE_SEND_INTERVAL_SECONDS) {
             throw new AuthException(AuthError.EMAIL_CODE_TOO_FREQUENT);

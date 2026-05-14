@@ -818,20 +818,7 @@
 
 **响应 data：** `ChatMessageVO[]`
 
-### 7.2 POST `/api/chat/send`
-
-发送聊天消息（HTTP 方式，WebSocket 也可发）。
-
-**需登录**。
-
-| 参数 | 类型 | 必填 | 说明 |
-|---|---|---|---|
-| articleId | int | 是 | |
-| content | string | 是 | |
-| teamId | int | 否 | 团队上下文 |
-| messageType | int | 否 | 0=文本（默认）, 1=系统 |
-
-### 7.3 GET `/api/chat/online-members`
+### 7.2 GET `/api/chat/online-members`
 
 获取文章聊天在线用户。
 

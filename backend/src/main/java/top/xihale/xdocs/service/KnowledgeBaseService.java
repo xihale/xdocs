@@ -12,6 +12,8 @@ import top.xihale.xdocs.po.User;
 import top.xihale.xdocs.service.NotificationService;
 import top.xihale.xdocs.util.SqlBuilder;
 
+import top.xihale.xdocs.vo.KnowledgeBaseVO;
+
 import java.util.ArrayList;
 import java.util.LinkedHashMap;
 import java.util.List;
@@ -222,6 +224,45 @@ public class KnowledgeBaseService {
             throw new KbException(KbError.CANNOT_CHANGE_KB_OWNER_ROLE);
         }
         KnowledgeBaseMemberDao.INSTANCE.updateRole(kbId, userId, role);
+    }
+
+    // ==================== VO 转换 ====================
+
+    public static KnowledgeBaseVO toVO(KnowledgeBase kb) {
+        User creator = UserDao.INSTANCE.findById(kb.getCreatorId()).orElse(null);
+        int articleCount = ArticleDao.INSTANCE.findByKnowledgeBaseId(kb.getId()).size();
+
+        KnowledgeBaseVO vo = new KnowledgeBaseVO();
+        vo.setId(kb.getId());
+        vo.setName(kb.getName());
+        vo.setDescription(kb.getDescription());
+        vo.setVisibility(kb.getVisibility());
+        vo.setOwnerType(kb.getOwnerType());
+        vo.setOwnerId(kb.getOwnerId());
+
+        // ownerName
+        if (kb.getOwnerType() == OwnerType.TEAM.getCode()) {
+            var team = TeamDao.INSTANCE.findById(kb.getOwnerId()).orElse(null);
+            vo.setOwnerName(team != null ? team.getName() : null);
+        } else {
+            User owner = UserDao.INSTANCE.findById(kb.getOwnerId()).orElse(null);
+            vo.setOwnerName(owner != null ? (owner.getNickname() != null ? owner.getNickname() : owner.getUsername()) : null);
+        }
+
+        vo.setCreatorId(kb.getCreatorId());
+        vo.setCreatorName(creator != null ? (creator.getNickname() != null ? creator.getNickname() : creator.getUsername()) : null);
+        vo.setArticleCount(articleCount);
+        vo.setCreateTime(kb.getCreateTime());
+        vo.setUpdateTime(kb.getUpdateTime());
+        return vo;
+    }
+
+    public static List<KnowledgeBaseVO> toVOList(List<KnowledgeBase> list) {
+        List<KnowledgeBaseVO> voList = new ArrayList<>();
+        for (KnowledgeBase kb : list) {
+            voList.add(toVO(kb));
+        }
+        return voList;
     }
 
     // ==================== 查询辅助 ====================

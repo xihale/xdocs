@@ -430,12 +430,6 @@ export const chatApi = {
       {},
       "获取聊天记录失败",
     ),
-
-  send: (articleId: number, content: string, teamId?: number) =>
-    request<void>("/chat/send", {
-      method: "POST",
-      body: JSON.stringify({ articleId, content, teamId }),
-    }),
 };
 
 // ==================== Upload ====================

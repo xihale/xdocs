@@ -30,7 +30,7 @@ public class KnowledgeBaseServlet extends BaseServlet {
         int ownerId = ownerType == OwnerType.TEAM.getCode() ? requiredIntParam(req, "ownerId") : userId;
 
         var kb = KnowledgeBaseService.createKnowledgeBase(name, description, visibility, ownerType, ownerId, userId);
-        res.ok(kb);
+        res.ok(KnowledgeBaseService.toVO(kb));
     }
 
     @Put("/update")
@@ -47,7 +47,7 @@ public class KnowledgeBaseServlet extends BaseServlet {
         if (description != null) kb.setDescription(description);
 
         KnowledgeBaseService.updateKnowledgeBase(kb);
-        res.ok(kb);
+        res.ok(KnowledgeBaseService.toVO(kb));
     }
 
     @Delete("/delete")
@@ -63,7 +63,7 @@ public class KnowledgeBaseServlet extends BaseServlet {
     private void handleDetail(HttpServletRequest req, ResponseUtils.HttpResponse res) throws IOException {
         int kbId = requiredIntParam(req, "id");
         var kb = KnowledgeBaseService.findKnowledgeBaseById(kbId);
-        res.ok(kb);
+        res.ok(KnowledgeBaseService.toVO(kb));
     }
 
     @Get("/list")
@@ -72,14 +72,14 @@ public class KnowledgeBaseServlet extends BaseServlet {
         int ownerId = requiredIntParam(req, "ownerId");
 
         var list = KnowledgeBaseService.findByOwner(ownerType, ownerId);
-        res.ok(list);
+        res.ok(KnowledgeBaseService.toVOList(list));
     }
 
     @Get("/list-mine")
     private void handleListMine(HttpServletRequest req, ResponseUtils.HttpResponse res) throws IOException {
         int userId = getRequiredUserId(req);
         var list = KnowledgeBaseService.findByOwner(OwnerType.USER.getCode(), userId);
-        res.ok(list);
+        res.ok(KnowledgeBaseService.toVOList(list));
     }
 
     @Get("/members")

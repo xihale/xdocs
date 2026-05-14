@@ -4,8 +4,6 @@ import jakarta.servlet.annotation.WebServlet;
 import jakarta.servlet.http.HttpServletRequest;
 import top.xihale.xdocs.service.ChatService;
 import top.xihale.xdocs.servlet.route.Get;
-import top.xihale.xdocs.servlet.route.Post;
-import top.xihale.xdocs.util.HtmlSanitizer;
 import top.xihale.xdocs.util.ResponseUtils;
 import top.xihale.xdocs.websocket.ChatWebSocket;
 
@@ -26,19 +24,6 @@ public class ChatServlet extends BaseServlet {
         int limit = optionalIntParamOrDefault(req, "limit", 50);
 
         res.ok(ChatService.getHistoryWithVO(articleId, limit));
-    }
-
-    @Post("/send")
-    private void handleSend(HttpServletRequest req, ResponseUtils.HttpResponse res) throws IOException {
-        int senderId = getRequiredUserId(req);
-        int articleId = requiredIntParam(req, "articleId");
-        Integer teamId = optionalIntParam(req, "teamId");
-        String content = requiredParam(req, "content");
-        content = HtmlSanitizer.stripHtml(content);
-        int messageType = optionalIntParamOrDefault(req, "messageType", 0);
-
-        ChatService.sendMessage(articleId, teamId, senderId, messageType, content);
-        res.ok();
     }
 
     @Get("/online-members")

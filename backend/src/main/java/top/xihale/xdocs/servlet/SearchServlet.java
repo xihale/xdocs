@@ -3,6 +3,7 @@ package top.xihale.xdocs.servlet;
 import jakarta.servlet.annotation.WebServlet;
 import jakarta.servlet.http.HttpServletRequest;
 import top.xihale.xdocs.service.ArticleService;
+import top.xihale.xdocs.service.KnowledgeBaseService;
 import top.xihale.xdocs.service.UserService;
 import top.xihale.xdocs.servlet.route.Get;
 import top.xihale.xdocs.servlet.route.Public;
@@ -39,7 +40,7 @@ public class SearchServlet extends BaseServlet {
     private void handleSearchKbs(HttpServletRequest req, ResponseUtils.HttpResponse res) throws IOException {
         String keyword = requiredParam(req, "keyword");
         var all = ArticleService.searchPublicKbs(keyword);
-        res.ok(all);
+        res.ok(KnowledgeBaseService.toVOList(all));
     }
 
     /**

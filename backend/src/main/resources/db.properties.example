@@ -1,4 +1,4 @@
 jdbc.driver=org.mariadb.jdbc.Driver
 jdbc.url=jdbc:mariadb://localhost:3306/xdocs?useUnicode=true&characterEncoding=utf8mb4
-jdbc.username=your_username
-jdbc.password=your_password
+jdbc.username=xdocs
+jdbc.password=xdocs123
