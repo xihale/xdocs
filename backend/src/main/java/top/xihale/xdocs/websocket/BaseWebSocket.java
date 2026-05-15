@@ -1,36 +1,34 @@
 package top.xihale.xdocs.websocket;
 
 import jakarta.websocket.*;
-import top.xihale.xdocs.config.WebConfig;
 
 import java.io.IOException;
-import java.util.logging.Level;
-import java.util.logging.Logger;
 
 /**
- * WebSocket 端点基类，提供公共的 CORS 校验和工具方法。
+ * WebSocket 端点基类，提供公共工具方法。
+ * <p>
+ * Origin 校验已统一到 CorsFilter/CsrfFilter（HTTP Upgrade 阶段）。
  * 认证由 AuthFilter 在 HTTP 层完成，WebSocketConfigurator 将 userId 注入 session userProperties。
  */
 public abstract class BaseWebSocket {
 
-    private static final Logger LOGGER = Logger.getLogger(BaseWebSocket.class.getName());
+    /**
+     * 从 session 获取已认证的 userId。
+     * AuthFilter 保证 WS 连接建立前已完成鉴权，此处不会返回 null。
+     */
+    protected int getUserId(Session session) {
+        Integer userId = (Integer) session.getUserProperties().get("userId");
+        if (userId == null) {
+            throw new IllegalStateException("userId not found in session userProperties");
+        }
+        return userId;
+    }
 
     /**
-     * 校验 Origin 是否在 CORS 白名单中，不在则关闭连接。
-     * 逻辑与 CorsFilter 一致。
-     *
-     * @return true 表示 Origin 合法，false 表示已拒绝并关闭连接
+     * 从 session 获取已认证的 userId，可能为 null。
      */
-    protected boolean checkOrigin(Session session) {
-        String origin = (String) session.getUserProperties().get(WebSocketConfigurator.ORIGIN_KEY);
-
-        if (origin == null || !WebConfig.isAllowedOrigin(origin)) {
-            LOGGER.log(Level.WARNING, "WebSocket connection rejected: Origin {0} not allowed",
-                    origin);
-            closeSession(session, "Origin not allowed");
-            return false;
-        }
-        return true;
+    protected Integer getUserIdOrNull(Session session) {
+        return (Integer) session.getUserProperties().get("userId");
     }
 
     /**

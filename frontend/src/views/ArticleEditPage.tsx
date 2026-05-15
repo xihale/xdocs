@@ -10,10 +10,13 @@ import type { CollabStatus } from "../components/Editor/Editor";
 import { useChat } from "../hooks/useChat";
 import { useChatStore } from "../stores/chat";
 
-/** Extract first H1 from markdown content */
+/** Extract first H1 from markdown content, truncated to 200 chars */
+const MAX_TITLE_LENGTH = 200;
+
 function extractTitle(md: string): string {
   const match = md.match(/^#\s+(.+)$/m);
-  return match ? match[1]!.trim() : "";
+  const title = match ? match[1]!.trim() : "";
+  return title.length > MAX_TITLE_LENGTH ? title.slice(0, MAX_TITLE_LENGTH) : title;
 }
 
 export function ArticleEditPage() {
@@ -75,12 +78,18 @@ export function ArticleEditPage() {
     };
   }, [id, navigate]);
 
-  const handleSave = useCallback(async () => {
+  const handleSave = useCallback(async (manual = false) => {
     if (!articleRef.current) return;
     const currentContent = contentRef.current;
     const currentTitle = extractTitle(currentContent);
     const contentChanged = currentContent !== lastSavedContentRef.current;
     const titleChanged = currentTitle !== lastSavedTitleRef.current;
+
+    // Avoid destructive autosave while collaborative editor is still bootstrapping.
+    // Milkdown/Yjs can briefly report empty markdown before initial content is applied.
+    if (!manual && lastSavedContentRef.current.trim() && !currentContent.trim()) {
+      return;
+    }
 
     if (!contentChanged && !titleChanged) {
       setDirty(false);
@@ -90,9 +99,9 @@ export function ArticleEditPage() {
     setSaving(true);
     setSaveError("");
     try {
-      // Save content
+      // Save content. Preserve intentional empty document on manual save.
       if (contentChanged) {
-        await articleApi.save(articleRef.current.id, currentContent || undefined);
+        await articleApi.save(articleRef.current.id, currentContent);
       }
       // Sync title if changed
       if (titleChanged && currentTitle) {
@@ -118,7 +127,7 @@ export function ArticleEditPage() {
   // 自动保存：编辑器加载完成后每 2 秒保存一次
   useEffect(() => {
     if (loading || noPermission || !article) return;
-    const timer = setInterval(() => handleSave(), 2000);
+    const timer = setInterval(() => handleSave(false), 2000);
     return () => clearInterval(timer);
   }, [loading, noPermission, article, handleSave]);
 
@@ -127,7 +136,7 @@ export function ArticleEditPage() {
     const handler = (e: KeyboardEvent) => {
       if ((e.ctrlKey || e.metaKey) && e.key === "s") {
         e.preventDefault();
-        handleSave();
+        handleSave(true);
       }
     };
     window.addEventListener("keydown", handler);

@@ -10,10 +10,10 @@ import java.util.List;
 import java.util.Map;
 
 /**
- * WebSocket Configurator，在握手阶段将 Origin header 和 userId 存入 userProperties，
- * 供 BaseWebSocket.checkOrigin() 和 endpoint @OnOpen 使用。
+ * WebSocket Configurator，在握手阶段从 Cookie JWT 提取 userId 存入 userProperties。
  * <p>
- * AuthFilter 已在 HTTP 层通过 Cookie JWT 鉴权，此处仅从 Cookie 提取 userId 传递给 endpoint。
+ * AuthFilter 在 HTTP 层通过 Cookie JWT 鉴权，此处从 Cookie 中解析同一个 token
+ * 提取 userId 传递给 WebSocket endpoint。
  */
 public class WebSocketConfigurator extends ServerEndpointConfig.Configurator {
 

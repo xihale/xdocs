@@ -6,9 +6,7 @@ import jakarta.websocket.server.ServerEndpoint;
 import top.xihale.xdocs.po.User;
 import top.xihale.xdocs.service.UserService;
 
-import java.io.ByteArrayOutputStream;
 import java.io.IOException;
-import java.util.Set;
 import java.util.logging.Level;
 import java.util.logging.Logger;
 
@@ -18,20 +16,20 @@ import java.util.logging.Logger;
  * 后端不维护 Yjs 文档状态，仅负责：
  * 1. 消息转发（relay）：将收到的 Sync/Awareness 消息转发给房间内其他用户
  * 2. 用户去重：同一用户刷新/重连时踢掉旧 session
- * 3. Awareness 清理：用户断连时广播 awareness remove
+ * 3. 保持协议透明：不主动构造 Yjs 消息，避免损坏 y-websocket/lib0 编码
  * <p>
  * 同步流程（y-websocket 协议）：
  * <pre>
  * 新用户加入:
- *   Server → 广播 SyncStep1 [0,0] 给房间内其他人
- *   其他用户 → 回复 SyncStep2 → Server 转发给新用户
+ *   新用户 → SyncStep1 → Server 转发给房间内其他人
+ *   其他用户 → SyncStep2 → Server 转发给新用户
  *   新用户 Yjs CRDT 自动合并
  *
  * 编辑:
- *   用户 → Update [0,2,...] → Server 转发给其他人
+ *   用户 → Update → Server 转发给其他人
  *
  * 断连:
- *   Server → 广播 awareness remove + QueryAwareness [3]
+ *   Server 只移除 session；Awareness 由客户端/provider 生命周期处理
  * </pre>
  * <p>
  * 消息类型（y-websocket 协议）：
@@ -49,10 +47,7 @@ public class CollaborationWebSocket extends BaseWebSocket {
 
     @OnOpen
     public void onOpen(Session session, @PathParam("docId") String docId) {
-        if (!checkOrigin(session)) return;
-
-        // AuthFilter 已在 HTTP 层完成鉴权，WebSocketConfigurator 从 Cookie 提取 userId
-        Integer userId = (Integer) session.getUserProperties().get("userId");
+        Integer userId = getUserIdOrNull(session);
         if (userId == null) {
             closeSession(session, "Unauthorized");
             return;
@@ -69,19 +64,10 @@ public class CollaborationWebSocket extends BaseWebSocket {
         Session previousSession = roomManager.bindActiveSession(docId, userId, session);
         roomManager.closeReplacedSession(previousSession);
 
-        // 向房间内其他人广播 SyncStep1，触发他们向新用户发送 SyncStep2
-        roomManager.broadcastBinary(docId, new byte[]{0, 0}, session);
-
-        // 如果房间只有自己（第一个用户），没人会回复 SyncStep2。
-        // 发送空 SyncStep2 [0,1,0] 让前端 y-websocket 完成同步握手。
-        if (roomManager.getRoomSize(docId) <= 1) {
-            try {
-                session.getBasicRemote().sendBinary(java.nio.ByteBuffer.wrap(new byte[]{0, 1, 0}));
-            } catch (IOException ignored) {}
-        }
-
-        // 广播 QueryAwareness，让所有人重新发送 awareness 状态
-        roomManager.broadcastBinary(docId, new byte[]{3});
+        // 纯中继模式：不要主动构造 sync/awareness 协议包。
+        // y-websocket 的消息格式是 lib0 varUint + payload；硬编码 byte[]{0,0}/byte[]{3}
+        // 会产生不完整包，前端 readMessage/readSyncMessage 抛 Unexpected end of array。
+        // 新客户端会在 onopen 自动发送 SyncStep1，房间内其他客户端收到转发后会回 SyncStep2。
 
         LOGGER.log(Level.INFO, "User {0} joined doc {1}. Room size: {2}",
                 new Object[]{user.getNickname(), docId, roomManager.getRoomSize(docId)});
@@ -89,42 +75,24 @@ public class CollaborationWebSocket extends BaseWebSocket {
 
     @OnMessage
     public void onMessage(byte[] message, Session session, @PathParam("docId") String docId) {
-        if (message.length == 0) return;
-
-        int messageType = message[0] & 0xFF;
-
-        if (messageType == 0) {
-            // Sync 消息（SyncStep1/SyncStep2/Update）— 纯转发
-            roomManager.broadcastBinary(docId, message, session);
-        } else if (messageType == 1) {
-            // Awareness 消息 — 提取 clientID 供断连清理，然后转发
-            extractAndStoreClientId(session, message);
-            roomManager.broadcastBinary(docId, message, session);
-        } else if (messageType == 3) {
-            // QueryAwareness 回复 — 转发
-            roomManager.broadcastBinary(docId, message, session);
+        if (!isValidYWebsocketMessage(message)) {
+            LOGGER.log(Level.FINE, "Drop invalid y-websocket message. doc={0}, length={1}",
+                    new Object[]{docId, message == null ? 0 : message.length});
+            return;
         }
-        // messageType=2 (Auth) 不处理
+
+        // Standard y-websocket relay mode.
+        // Do not parse/rebuild messages. Forward exact binary frame to other clients in same room.
+        roomManager.broadcastBinary(docId, message, session);
     }
 
     @OnClose
     public void onClose(Session session, @PathParam("docId") String docId) {
-        Integer userId = (Integer) session.getUserProperties().get("userId");
-        roomManager.unbindActiveSession(docId, userId, session);
-        roomManager.leave(docId, session);
-
-        // 广播 awareness remove，清理其他客户端的幽灵光标
-        Object clientIdObj = session.getUserProperties().get("yjsClientId");
-        if (clientIdObj instanceof Long) {
-            long clientId = (Long) clientIdObj;
-            byte[] removeMsg = buildAwarenessRemoveMessage(clientId);
-            if (removeMsg != null) {
-                roomManager.broadcastBinary(docId, removeMsg);
-            }
+        Integer userId = getUserIdOrNull(session);
+        if (userId != null) {
+            roomManager.unbindActiveSession(docId, userId, session);
         }
-
-        // 广播 QueryAwareness，让剩余用户重新发送 awareness 状态
-        roomManager.broadcastBinary(docId, new byte[]{3});
+        roomManager.leave(docId, session);
 
         LOGGER.log(Level.INFO, "Session closed for doc {0}. Room size: {1}",
                 new Object[]{docId, roomManager.getRoomSize(docId)});
@@ -158,49 +126,53 @@ public class CollaborationWebSocket extends BaseWebSocket {
         RoomManager.getInstance().broadcastText(docId, message);
     }
 
-    // ==================== Awareness Helpers ====================
+    // ==================== y-websocket frame validation ====================
 
     /**
-     * 从 awareness 消息中提取第一个 clientID 并存储到 session 属性中。
-     * <p>
-     * awareness 消息格式: [1, VarUint(numClients), VarUint(clientID), VarUint(clock), VarString(state), ...]
+     * Validate only outer y-websocket frame shape.
+     *
+     * y-websocket message format:
+     * - 0 Sync: [0, syncMessageType, payload...]
+     *   - SyncStep1 [0,0] has no payload
+     *   - SyncStep2/Update carry VarUint8Array payload
+     * - 1 Awareness: [1, VarUint8Array(awarenessUpdate)]
+     * - 2 Auth: [2, payload...]
+     * - 3 QueryAwareness: [3]
+     *
+     * Server is relay, not Yjs decoder. Validation exists only to avoid forwarding
+     * known-bad truncated frames like [0,0], which crash frontend lib0 decoder with
+     * "Unexpected end of array".
      */
-    private void extractAndStoreClientId(Session session, byte[] message) {
-        try {
-            if (message.length < 2) return;
-            int offset = 1;
-            long numClients = readVarUint(message, offset);
-            offset += varUintLength(numClients);
-            if (numClients <= 0) return;
-            long clientId = readVarUint(message, offset);
-            session.getUserProperties().put("yjsClientId", clientId);
-        } catch (Exception ignored) {}
-    }
+    private static boolean isValidYWebsocketMessage(byte[] message) {
+        if (message == null || message.length == 0) return false;
 
-    /**
-     * Build a y-websocket awareness remove message for a given clientID.
-     * <p>
-     * Format: [1 (messageAwareness), VarUint(1), VarUint(clientID), VarUint(clock=MAX), VarString("null")]
-     */
-    private static byte[] buildAwarenessRemoveMessage(long clientId) {
-        try {
-            ByteArrayOutputStream out = new ByteArrayOutputStream();
-            out.write(1);
-            writeVarUint(out, 1);
-            writeVarUint(out, clientId);
-            writeVarUint(out, Integer.MAX_VALUE);
-            byte[] stateBytes = "null".getBytes("UTF-8");
-            writeVarUint(out, stateBytes.length);
-            out.write(stateBytes);
-            return out.toByteArray();
-        } catch (IOException e) {
-            return null;
+        int messageType = message[0] & 0xFF;
+        if (messageType == 3) return message.length == 1;
+        if (messageType == 2) return true;
+
+        if (messageType == 0) {
+            if (message.length < 2) return false;
+            int syncType = message[1] & 0xFF;
+            if (syncType > 2) return false;
+            if (syncType == 0) return message.length == 2;
+            return hasCompleteVarUint8Array(message, 2);
         }
+
+        if (messageType == 1) {
+            return hasCompleteVarUint8Array(message, 1);
+        }
+
+        return false;
     }
 
-    // ==================== lib0 encoding helpers ====================
+    private static boolean hasCompleteVarUint8Array(byte[] message, int offset) {
+        VarUintResult length = readVarUint(message, offset);
+        if (!length.valid) return false;
+        long end = (long) length.nextOffset + length.value;
+        return end == message.length;
+    }
 
-    private static long readVarUint(byte[] data, int offset) {
+    private static VarUintResult readVarUint(byte[] data, int offset) {
         long value = 0;
         int shift = 0;
         int pos = offset;
@@ -208,24 +180,14 @@ public class CollaborationWebSocket extends BaseWebSocket {
             int b = data[pos] & 0xFF;
             value |= (long) (b & 0x7F) << shift;
             pos++;
-            if ((b & 0x80) == 0) break;
+            if ((b & 0x80) == 0) {
+                return new VarUintResult(true, value, pos);
+            }
             shift += 7;
+            if (shift > 63) return new VarUintResult(false, 0, pos);
         }
-        return value;
+        return new VarUintResult(false, 0, pos);
     }
 
-    private static int varUintLength(long value) {
-        int len = 0;
-        do { len++; value >>>= 7; } while (value > 0);
-        return len;
-    }
-
-    private static void writeVarUint(ByteArrayOutputStream out, long value) throws IOException {
-        do {
-            int b = (int) (value & 0x7F);
-            value >>>= 7;
-            if (value > 0) b |= 0x80;
-            out.write(b);
-        } while (value > 0);
-    }
+    private record VarUintResult(boolean valid, long value, int nextOffset) {}
 }

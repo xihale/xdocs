@@ -52,10 +52,7 @@ public class ChatWebSocket extends BaseWebSocket {
 
     @OnOpen
     public void onOpen(Session session, @PathParam("articleId") String articleId) {
-        if (!checkOrigin(session)) return;
-
-        // AuthFilter 已在 HTTP 层完成鉴权，WebSocketConfigurator 从 Cookie 提取 userId
-        Integer userId = (Integer) session.getUserProperties().get("userId");
+        Integer userId = getUserIdOrNull(session);
         if (userId == null) {
             closeSession(session, "Unauthorized");
             return;
@@ -122,11 +119,13 @@ public class ChatWebSocket extends BaseWebSocket {
     @OnClose
     public void onClose(Session session, @PathParam("articleId") String articleId) {
         UserInfo userInfo = sessionUserMap.remove(session.getId());
-        Integer userId = (Integer) session.getUserProperties().get("userId");
+        Integer userId = getUserIdOrNull(session);
         boolean replaced = Boolean.TRUE.equals(session.getUserProperties().get("replaced"));
         LOGGER.log(Level.INFO, "Chat WebSocket closed: user={0}, article={1}, replaced={2}, roomSize={3}",
                 new Object[]{userId, articleId, replaced, roomManager.getRoomSize(articleId)});
-        roomManager.unbindActiveSession(articleId, userId, session);
+        if (userId != null) {
+            roomManager.unbindActiveSession(articleId, userId, session);
+        }
         roomManager.leave(articleId, session);
 
         // 被替代的 session 不广播离开消息（已由新 session 的加入消息替代）

@@ -6,7 +6,7 @@ import "@uiw/react-textarea-code-editor/dist.css";
 
 import { Crepe } from "@milkdown/crepe";
 
-import { Editor } from "@milkdown/kit/core";
+import { Editor, editorStateCtx, EditorStateReady } from "@milkdown/kit/core";
 import { listenerCtx } from "@milkdown/kit/plugin/listener";
 import { collab, collabServiceCtx, CollabReady, CollabService } from "@milkdown/plugin-collab";
 import { Milkdown, MilkdownProvider, useEditor } from "@milkdown/react";
@@ -61,6 +61,7 @@ function cursorBuilder(user: { name: string; color: string }): HTMLElement {
   el.style.borderLeft = `2px solid ${user.color}`;
   el.style.marginLeft = "-1px";
   el.style.position = "relative";
+  el.style.userSelect = "none";
 
   const label = document.createElement("span");
   label.className = "collab-cursor-label";
@@ -76,6 +77,7 @@ function cursorBuilder(user: { name: string; color: string }): HTMLElement {
   label.style.color = "#fff";
   label.style.whiteSpace = "nowrap";
   label.style.pointerEvents = "none";
+  label.style.userSelect = "none";
 
   el.appendChild(label);
   return el;
@@ -146,7 +148,7 @@ export default function MarkdownEditor({
     const handleSync = (isSynced: boolean) => {
       if (!isSynced || templateAppliedRef.current) return;
 
-      const xmlFragment = yDoc.getXmlFragment("content");
+      const xmlFragment = yDoc.getXmlFragment("prosemirror");
       if (xmlFragment.length === 0 && initialContentRef.current) {
         templateAppliedRef.current = true;
         const tryApply = () => {
@@ -264,6 +266,34 @@ function MilkdownEditorInner({
   // Track whether this editor instance is still alive.
   const aliveRef = useRef(true);
 
+  // Observe Yjs doc changes and forward to onChange.
+  // milkdown's markdownUpdated may not fire for remote Yjs updates,
+  // so we listen on the Yjs XmlFragment directly as a reliable fallback.
+  useEffect(() => {
+    const fragment = yDoc.getXmlFragment("prosemirror");
+    let timer: ReturnType<typeof setTimeout> | null = null;
+
+    const observer = () => {
+      if (!aliveRef.current) return;
+      // Debounce: coalesce rapid updates (both local and remote)
+      if (timer) clearTimeout(timer);
+      timer = setTimeout(() => {
+        const ed = editorRef.current;
+        if (!ed) return;
+        try {
+          const md = normalizeHighlightedCodeFences(ed.action(getMarkdown()) ?? "");
+          onChangeRef.current?.(md);
+        } catch { /* editor not ready */ }
+      }, 100);
+    };
+
+    fragment.observeDeep(observer);
+    return () => {
+      fragment.unobserveDeep(observer);
+      if (timer) clearTimeout(timer);
+    };
+  }, [yDoc, editorRef, onChangeRef]);
+
   const { get } = useEditor((root) => {
     aliveRef.current = true;
 
@@ -291,9 +321,12 @@ function MilkdownEditorInner({
           onChangeRef.current?.(normalizeHighlightedCodeFences(markdown));
         });
 
-        ctx.wait(CollabReady).then(() => {
+        ctx.wait(CollabReady).then(async () => {
           if (!aliveRef.current) return;
           try {
+            await ctx.wait(EditorStateReady);
+            if (!aliveRef.current || !ctx.isInjected(editorStateCtx)) return;
+
             const collabService = ctx.get(collabServiceCtx);
             collabServiceRef.current = collabService;
 
@@ -307,8 +340,10 @@ function MilkdownEditorInner({
               });
 
             collabService.connect();
-          } catch {
-            // editor already destroyed
+          } catch (error) {
+            if (aliveRef.current) {
+              console.warn("Collaboration setup skipped", error);
+            }
           }
         });
       });
