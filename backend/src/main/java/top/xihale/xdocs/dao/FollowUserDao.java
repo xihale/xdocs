@@ -24,7 +24,7 @@ public class FollowUserDao {
     public static boolean exists(int followerId, int followingId) {
         return Db.sql("SELECT 1 FROM follow_user WHERE follower_id = :followerId AND following_id = :followingId LIMIT 1")
                 .param("followerId", followerId).param("followingId", followingId)
-                .query(Integer.class)
+                .query(rs -> rs.getInt(1))
                 .exists();
     }
 
@@ -47,14 +47,14 @@ public class FollowUserDao {
     public static int countFollowing(int followerId) {
         return Db.sql("SELECT COUNT(*) FROM follow_user WHERE follower_id = :followerId")
                 .param("followerId", followerId)
-                .query(Integer.class)
+                .query(rs -> rs.getInt(1))
                 .count();
     }
 
     public static int countFollowers(int followingId) {
         return Db.sql("SELECT COUNT(*) FROM follow_user WHERE following_id = :followingId")
                 .param("followingId", followingId)
-                .query(Integer.class)
+                .query(rs -> rs.getInt(1))
                 .count();
     }
 }

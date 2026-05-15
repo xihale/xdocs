@@ -44,7 +44,7 @@ public class ArticleLikeDao {
     public static boolean exists(int articleId, int userId) {
         return Db.sql("SELECT 1 FROM article_like WHERE article_id = :articleId AND user_id = :userId LIMIT 1")
                 .param("articleId", articleId).param("userId", userId)
-                .query(Integer.class)
+                .query(rs -> rs.getInt(1))
                 .exists();
     }
 
@@ -54,7 +54,7 @@ public class ArticleLikeDao {
     public static int countByArticle(int articleId) {
         return Db.sql("SELECT COUNT(*) FROM article_like WHERE article_id = :articleId")
                 .param("articleId", articleId)
-                .query(Integer.class)
+                .query(rs -> rs.getInt(1))
                 .count();
     }
 }

@@ -38,7 +38,7 @@ public class FavoriteDao {
     public static boolean exists(int userId, int targetType, int targetId) {
         return Db.sql("SELECT 1 FROM favorite WHERE user_id = :userId AND target_type = :targetType AND target_id = :targetId LIMIT 1")
                 .param("userId", userId).param("targetType", targetType).param("targetId", targetId)
-                .query(Integer.class)
+                .query(rs -> rs.getInt(1))
                 .exists();
     }
 
