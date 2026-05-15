@@ -23,12 +23,6 @@ public class CorsFilter implements Filter {
         HttpServletRequest req = (HttpServletRequest) request;
         HttpServletResponse resp = (HttpServletResponse) response;
 
-        // WebSocket 升级请求不需要 CORS headers（WS 自有 Origin 检查）
-        if ("websocket".equalsIgnoreCase(req.getHeader("Upgrade"))) {
-            chain.doFilter(request, response);
-            return;
-        }
-
         String origin = req.getHeader("Origin");
 
         if (origin != null && WebConfig.isAllowedOrigin(origin)) {

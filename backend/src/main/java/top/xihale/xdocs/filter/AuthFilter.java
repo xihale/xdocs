@@ -17,6 +17,7 @@ import top.xihale.xdocs.servlet.ArticleServlet;
 import top.xihale.xdocs.servlet.AuthServlet;
 import top.xihale.xdocs.servlet.SearchServlet;
 import top.xihale.xdocs.servlet.route.RouteRegistry;
+import jakarta.servlet.http.HttpSession;
 import top.xihale.xdocs.util.JwtUtil;
 import top.xihale.xdocs.util.ResponseUtils;
 
@@ -53,21 +54,6 @@ public class AuthFilter implements Filter {
             req.setCharacterEncoding("UTF-8");
         }
 
-        // WebSocket 升级请求：复用 Cookie JWT 鉴权，无效则直接 401 拒绝握手。
-        // 其余 filter（Cors/Csrf/Exception）仍无条件放行 WS 升级请求。
-        if ("websocket".equalsIgnoreCase(req.getHeader("Upgrade"))) {
-            AuthState authState = resolveAuthState(req);
-            if (authState.userId() == null || authState.banned()) {
-                ResponseUtils.writeError(resp, ResponseCode.UNAUTHORIZED);
-                return;
-            }
-            // 将 userId 注入 request attribute，供 @OnOpen 读取
-            req.setAttribute("userId", authState.userId());
-            req.setAttribute("currentUser", authState.user());
-            chain.doFilter(request, response);
-            return;
-        }
-
         String requestPath = getRequestPath(req);
         boolean whitelisted = isWhitelisted(requestPath);
         AuthState authState = resolveAuthState(req);
@@ -81,6 +67,7 @@ public class AuthFilter implements Filter {
             req.setAttribute("userId", authState.userId());
             req.setAttribute("role", authState.role());
             req.setAttribute("currentUser", authState.user());
+            req.getSession().setAttribute("userId", authState.userId());
         }
 
         if (authState.banned() && !whitelisted) {
@@ -135,9 +122,7 @@ public class AuthFilter implements Filter {
 
     private Integer getUserIdFromToken(HttpServletRequest req) {
         String token = getTokenFromCookie(req);
-        if (token == null) {
-            return null;
-        }
+        if (token == null) return null;
         return JwtUtil.getUserId(token);
     }
 

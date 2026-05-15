@@ -23,13 +23,7 @@ public class CsrfFilter implements Filter {
         HttpServletRequest req = (HttpServletRequest) request;
         HttpServletResponse resp = (HttpServletResponse) response;
 
-        // WebSocket 升级请求不走 CSRF 校验（WS 自有 Origin 检查）
-        if ("websocket".equalsIgnoreCase(req.getHeader("Upgrade"))) {
-            chain.doFilter(request, response);
-            return;
-        }
-
-        if (!isUnsafeMethod(req.getMethod()) || !hasAuthenticatedToken(req)) {
+        if (!requiresCsrfCheck(req)) {
             chain.doFilter(request, response);
             return;
         }
@@ -42,11 +36,24 @@ public class CsrfFilter implements Filter {
         chain.doFilter(request, response);
     }
 
+    /**
+     * 需要校验 CSRF 的请求：不安全方法（POST/PUT/PATCH/DELETE）或 WebSocket 升级，且携带认证 Cookie。
+     * WebSocket 升级虽是 GET，但建立持久连接，等同于不安全方法。
+     */
+    private boolean requiresCsrfCheck(HttpServletRequest req) {
+        return (isUnsafeMethod(req.getMethod()) || isWebSocketUpgrade(req))
+                && hasAuthenticatedToken(req);
+    }
+
     private boolean isUnsafeMethod(String method) {
         return "POST".equalsIgnoreCase(method)
                 || "PUT".equalsIgnoreCase(method)
                 || "PATCH".equalsIgnoreCase(method)
                 || "DELETE".equalsIgnoreCase(method);
+    }
+
+    private boolean isWebSocketUpgrade(HttpServletRequest req) {
+        return "websocket".equalsIgnoreCase(req.getHeader("Upgrade"));
     }
 
     /**

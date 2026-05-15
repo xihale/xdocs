@@ -31,6 +31,9 @@ public class ArticleService {
         if (KnowledgeBaseDao.findById(kbId).isEmpty()) {
             throw new ArticleException(ArticleError.KB_NOT_FOUND);
         }
+        if (title != null && title.length() > MAX_TITLE_LENGTH) {
+            throw new IllegalArgumentException("标题长度不能超过 " + MAX_TITLE_LENGTH + " 个字符");
+        }
         Article article = new Article(kbId, title, content, authorId);
         ArticleDao.insert(article);
 
@@ -134,11 +137,20 @@ public class ArticleService {
                 .isPresent();
     }
 
+    private static final int MAX_TITLE_LENGTH = 200;
+    private static final int MAX_SUMMARY_LENGTH = 500;
+
     /**
      * 更新文章
      */
     public static void updateArticle(int articleId, String title, String content, String summary, Integer status, int operatorId) {
         ensureArticleEditable(articleId, operatorId);
+        if (title != null && title.length() > MAX_TITLE_LENGTH) {
+            throw new IllegalArgumentException("标题长度不能超过 " + MAX_TITLE_LENGTH + " 个字符");
+        }
+        if (summary != null && summary.length() > MAX_SUMMARY_LENGTH) {
+            throw new IllegalArgumentException("摘要长度不能超过 " + MAX_SUMMARY_LENGTH + " 个字符");
+        }
         Article article = findArticleById(articleId);
         int oldStatus = article.getStatus();
         boolean titleChanged = title != null && !title.equals(article.getTitle());

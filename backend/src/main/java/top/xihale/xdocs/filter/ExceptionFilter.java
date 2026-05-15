@@ -27,12 +27,6 @@ public class ExceptionFilter implements Filter {
         HttpServletRequest req = (HttpServletRequest) request;
         HttpServletResponse resp = (HttpServletResponse) response;
 
-        // WebSocket 升级请求不走异常捕获（避免干扰 WS 升级协议）
-        if ("websocket".equalsIgnoreCase(req.getHeader("Upgrade"))) {
-            chain.doFilter(request, response);
-            return;
-        }
-
         try {
             chain.doFilter(request, response);
         } catch (BusinessException e) {
