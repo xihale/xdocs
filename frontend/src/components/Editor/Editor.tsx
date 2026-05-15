@@ -94,23 +94,37 @@ export default function MarkdownEditor({
 }: EditorProps) {
   const [sourceContent, setSourceContent] = useState(() => initialContent || "");
   const sourceContentRef = useRef(initialContent || "");
+  const [shouldBootstrap, setShouldBootstrap] = useState<boolean | null>(null);
+
+  useEffect(() => {
+    let cancelled = false;
+    setShouldBootstrap(null);
+    fetch(`/api/collaboration-meta/claim-bootstrap?docId=${encodeURIComponent(documentId)}`, {
+      credentials: "include",
+    })
+      .then((res) => res.ok ? res.json() : Promise.reject(new Error(`HTTP ${res.status}`)))
+      .then((res) => {
+        if (cancelled) return;
+        setShouldBootstrap(Boolean(res?.data));
+      })
+      .catch(() => {
+        if (!cancelled) setShouldBootstrap(true);
+      });
+    return () => { cancelled = true; };
+  }, [documentId]);
 
   // Collab provider hook — owns Yjs Doc, Awareness, WebSocket lifecycle
-  const { yDoc, awareness, provider, status, users } = useCollabProvider(documentId, username);
+  const { yDoc, awareness, provider, status, users } = useCollabProvider(documentId, username, shouldBootstrap !== null);
 
   // Milkdown refs
   const editorRef = useRef<Editor | null>(null);
   const collabServiceRef = useRef<CollabService | null>(null);
 
-  // Template application: only apply once per documentId
-  const templateAppliedRef = useRef(false);
   const documentIdRef = useRef(documentId);
 
-  // Reset template flag when documentId changes
   useEffect(() => {
     if (documentId !== documentIdRef.current) {
       documentIdRef.current = documentId;
-      templateAppliedRef.current = false;
     }
   }, [documentId]);
 
@@ -141,37 +155,6 @@ export default function MarkdownEditor({
     onCollabUsersChangeRef.current?.(users);
   }, [users]);
 
-  // ---- Template application: apply initialContent when doc is empty after sync ----
-  useEffect(() => {
-    if (!provider || !yDoc) return;
-
-    const handleSync = (isSynced: boolean) => {
-      if (!isSynced || templateAppliedRef.current) return;
-
-      const xmlFragment = yDoc.getXmlFragment("prosemirror");
-      if (xmlFragment.length === 0 && initialContentRef.current) {
-        templateAppliedRef.current = true;
-        const tryApply = () => {
-          const cs = collabServiceRef.current;
-          if (cs) {
-            cs.applyTemplate(initialContentRef.current!);
-          } else {
-            window.setTimeout(tryApply, 100);
-          }
-        };
-        tryApply();
-      }
-    };
-
-    // If already synced (e.g. reconnect), check immediately
-    if (provider.synced) {
-      handleSync(true);
-    }
-
-    provider.on("sync", handleSync);
-    return () => { provider.off("sync", handleSync); };
-  }, [provider, yDoc]); // only re-run when provider or yDoc instance changes
-
   // ---- Sync source ↔ milkdown when switching modes ----
   const prevSourceModeRef = useRef(sourceMode);
 
@@ -179,7 +162,7 @@ export default function MarkdownEditor({
     // WYSIWYG → source: grab current markdown from milkdown
     if (sourceMode && !prevSourceModeRef.current) {
       const editor = editorRef.current;
-      if (editor) {
+      if (editor && collabServiceRef.current) {
         try {
           const md = normalizeHighlightedCodeFences(editor.action(getMarkdown()) ?? "");
           sourceContentRef.current = md;
@@ -210,7 +193,7 @@ export default function MarkdownEditor({
     <div className="flex-1 min-h-0 flex flex-col relative">
       {/* WYSIWYG milkdown editor */}
       <div className={`flex-1 min-h-0 overflow-hidden ${sourceMode ? "absolute inset-0 opacity-0 pointer-events-none" : ""}`}>
-        {yDoc && awareness && (
+        {yDoc && awareness && shouldBootstrap !== null && (
           <MilkdownProvider>
             <MilkdownEditorInner
               yDoc={yDoc}
@@ -218,6 +201,8 @@ export default function MarkdownEditor({
               editorRef={editorRef}
               collabServiceRef={collabServiceRef}
               onChangeRef={onChangeRef}
+              initialContent={initialContentRef.current || ""}
+              shouldBootstrap={shouldBootstrap}
             />
           </MilkdownProvider>
         )}
@@ -254,6 +239,8 @@ interface MilkdownEditorInnerProps {
   editorRef: React.MutableRefObject<Editor | null>;
   collabServiceRef: React.MutableRefObject<CollabService | null>;
   onChangeRef: React.MutableRefObject<((md: string) => void) | undefined>;
+  initialContent: string;
+  shouldBootstrap: boolean;
 }
 
 function MilkdownEditorInner({
@@ -262,9 +249,12 @@ function MilkdownEditorInner({
   editorRef,
   collabServiceRef,
   onChangeRef,
+  initialContent,
+  shouldBootstrap,
 }: MilkdownEditorInnerProps) {
   // Track whether this editor instance is still alive.
   const aliveRef = useRef(true);
+  const editorReadyRef = useRef(false);
 
   // Observe Yjs doc changes and forward to onChange.
   // milkdown's markdownUpdated may not fire for remote Yjs updates,
@@ -279,7 +269,7 @@ function MilkdownEditorInner({
       if (timer) clearTimeout(timer);
       timer = setTimeout(() => {
         const ed = editorRef.current;
-        if (!ed) return;
+        if (!ed || !editorReadyRef.current) return;
         try {
           const md = normalizeHighlightedCodeFences(ed.action(getMarkdown()) ?? "");
           onChangeRef.current?.(md);
@@ -327,6 +317,7 @@ function MilkdownEditorInner({
             await ctx.wait(EditorStateReady);
             if (!aliveRef.current || !ctx.isInjected(editorStateCtx)) return;
 
+            editorReadyRef.current = true;
             const collabService = ctx.get(collabServiceCtx);
             collabServiceRef.current = collabService;
 
@@ -338,6 +329,10 @@ function MilkdownEditorInner({
                   cursorBuilder: (user: { name: string; color: string }) => cursorBuilder(user),
                 },
               });
+
+            if (shouldBootstrap && initialContent) {
+              collabService.applyTemplate(initialContent);
+            }
 
             collabService.connect();
           } catch (error) {
@@ -358,7 +353,12 @@ function MilkdownEditorInner({
 
   // Mark dead on unmount or before next factory call
   useEffect(() => {
-    return () => { aliveRef.current = false; };
+    return () => {
+      aliveRef.current = false;
+      editorReadyRef.current = false;
+      editorRef.current = null;
+      collabServiceRef.current = null;
+    };
   }, [yDoc, awareness]);
 
   return <Milkdown />;

@@ -58,6 +58,7 @@ function buildCollabUsers(awareness: Awareness, username: string): CollabUser[] 
 export function useCollabProvider(
   documentId: string,
   username: string,
+  enabled = true,
 ): UseCollabProviderReturn {
   const [status, setStatus] = useState<CollabStatus>("disconnected");
   const [users, setUsers] = useState<CollabUser[]>([]);
@@ -107,7 +108,7 @@ export function useCollabProvider(
   useEffect(() => {
     const yDocInstance = yDocRef.current;
     const awarenessInstance = awarenessRef.current;
-    if (!yDocInstance || !awarenessInstance) return;
+    if (!enabled || !yDocInstance || !awarenessInstance) return;
 
     let cancelled = false;
     const connectionId = ++connectionIdRef.current;
@@ -207,7 +208,7 @@ export function useCollabProvider(
       setProvider(null);
       setStatus("disconnected");
     };
-  }, [documentId]); // BUG-6 fix: only depend on documentId, NOT initialContent
+  }, [documentId, enabled]); // only depend on documentId/enabled, NOT initialContent
 
   // ---- Awareness → users list ----
   useEffect(() => {

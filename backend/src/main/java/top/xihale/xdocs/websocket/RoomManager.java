@@ -26,6 +26,9 @@ public class RoomManager {
     /** 房间 ID → 用户 ID → 当前有效 Session ID（同用户去重） */
     private final ConcurrentHashMap<String, ConcurrentHashMap<Integer, String>> activeUserSessions = new ConcurrentHashMap<>();
 
+    /** 已被某个客户端声明初始化的协同房间。房间清空时重置。 */
+    private final Set<String> bootstrappedRooms = ConcurrentHashMap.newKeySet();
+
     private RoomManager() {}
 
     public static RoomManager getInstance() {
@@ -54,6 +57,7 @@ public class RoomManager {
         if (roomSessions.isEmpty()) {
             rooms.remove(roomId);
             activeUserSessions.remove(roomId);
+            bootstrappedRooms.remove(roomId);
         }
     }
 
@@ -78,6 +82,30 @@ public class RoomManager {
     public boolean hasRoom(String roomId) {
         Set<Session> room = rooms.get(roomId);
         return room != null && !room.isEmpty();
+    }
+
+    // ==================== Bootstrap claim ====================
+
+    /**
+     * 声明当前客户端负责把数据库中的初始内容写入 Yjs 文档。
+     * 同一房间只允许一个客户端成功；房间清空后重置。
+     */
+    public boolean claimBootstrap(String roomId, int userId) {
+        // 如果房间实际上已经空了，允许下一次打开重新从数据库初始化。
+        if (!hasRoom(roomId)) {
+            bootstrappedRooms.remove(roomId);
+            return bootstrappedRooms.add(roomId);
+        }
+
+        // 快速刷新时，旧 WebSocket 可能还没来得及 close。
+        // 如果房间里只有当前用户的旧连接，允许新页面重新初始化，随后旧连接会被去重关闭。
+        ConcurrentHashMap<Integer, String> roomActive = activeUserSessions.get(roomId);
+        if (roomActive != null && roomActive.size() == 1 && roomActive.containsKey(userId)) {
+            bootstrappedRooms.remove(roomId);
+            return bootstrappedRooms.add(roomId);
+        }
+
+        return bootstrappedRooms.add(roomId);
     }
 
     // ==================== User dedup ====================

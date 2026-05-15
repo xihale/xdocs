@@ -154,7 +154,8 @@ public class CollaborationWebSocket extends BaseWebSocket {
             if (message.length < 2) return false;
             int syncType = message[1] & 0xFF;
             if (syncType > 2) return false;
-            if (syncType == 0) return message.length == 2;
+            // SyncStep1/SyncStep2/Update all carry a varUint8Array payload.
+            // Even an empty state vector is encoded as a length byte, e.g. [0,0,0].
             return hasCompleteVarUint8Array(message, 2);
         }
 
