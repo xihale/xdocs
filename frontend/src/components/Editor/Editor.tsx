@@ -6,7 +6,7 @@ import "@uiw/react-textarea-code-editor/dist.css";
 
 import { Crepe } from "@milkdown/crepe";
 
-import { Editor, editorStateCtx, EditorStateReady } from "@milkdown/kit/core";
+import { Editor, editorStateCtx, editorViewCtx, prosePluginsCtx, EditorStateReady } from "@milkdown/kit/core";
 import { listenerCtx } from "@milkdown/kit/plugin/listener";
 import { collab, collabServiceCtx, CollabReady, CollabService } from "@milkdown/plugin-collab";
 import { Milkdown, MilkdownProvider, useEditor } from "@milkdown/react";
@@ -335,6 +335,23 @@ function MilkdownEditorInner({
             }
 
             collabService.connect();
+
+            // Remove ProseMirror's history plugin in collab mode.
+            // yUndoPlugin (from y-prosemirror) handles undo/redo via Yjs UndoManager.
+            // PM history also records remote sync transactions from ySyncPlugin,
+            // which creates phantom undo entries. Removing it leaves yUndoPlugin
+            // as the sole undo/redo system.
+            //
+            // After removal, PM history's undo() returns false (no plugin state),
+            // so Milkdown's keymap falls through to CollabKeymapPluginKey which
+            // calls y-prosemirror's undo().
+            // eslint-disable-next-line @typescript-eslint/no-explicit-any
+            const filteredPlugins = ctx.get(prosePluginsCtx).filter(
+              (p) => !((p as any).key?.key?.startsWith?.("history")),
+            );
+            ctx.set(prosePluginsCtx, filteredPlugins);
+            const view = ctx.get(editorViewCtx);
+            view.updateState(view.state.reconfigure({ plugins: filteredPlugins }));
           } catch (error) {
             if (aliveRef.current) {
               console.warn("Collaboration setup skipped", error);
