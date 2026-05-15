@@ -10,12 +10,26 @@ import type { CollabStatus } from "../components/Editor/Editor";
 import { useChat } from "../hooks/useChat";
 import { useChatStore } from "../stores/chat";
 
-/** Extract first H1 from markdown content, truncated to 200 chars */
+/** Parse top-level markdown title from a single ATX H1 line */
 const MAX_TITLE_LENGTH = 200;
 
+function parseTitleLine(line: string): string {
+  const match = line.match(/^ {0,3}#\s+(\S.*)$/);
+  if (!match) return "";
+
+  return match[1]!.replace(/\s+#+\s*$/, "").trim();
+}
+
+/** Extract document title from first non-empty markdown line only */
 function extractTitle(md: string): string {
-  const match = md.match(/^#\s+(.+)$/m);
-  const title = match ? match[1]!.trim() : "";
+  let title = "";
+
+  for (const line of md.split(/\r?\n/)) {
+    if (!line.trim()) continue;
+    title = parseTitleLine(line);
+    break;
+  }
+
   return title.length > MAX_TITLE_LENGTH ? title.slice(0, MAX_TITLE_LENGTH) : title;
 }
 

@@ -27,7 +27,7 @@ public class ArticleServlet extends BaseServlet {
         int userId = getRequiredUserId(req);
         int kbId = requiredIntParam(req, "kbId");
         String title = requiredParam(req, "title");
-        String content = optionalParam(req, "content");
+        String content = optionalRawParam(req, "content");
         if (content != null) content = HtmlSanitizer.sanitizeArticleContent(content);
 
         var article = ArticleService.createArticle(kbId, title, content, userId);
@@ -39,7 +39,7 @@ public class ArticleServlet extends BaseServlet {
         int userId = getRequiredUserId(req);
         int articleId = requiredIntParam(req, "id");
         String title = optionalParam(req, "title");
-        String content = optionalParam(req, "content");
+        String content = optionalRawParam(req, "content");
         if (content != null) content = HtmlSanitizer.sanitizeArticleContent(content);
         String summary = optionalParam(req, "summary");
         Integer status = optionalIntParam(req, "status");
@@ -108,7 +108,7 @@ public class ArticleServlet extends BaseServlet {
     private Result<?> handleSave(HttpServletRequest req, HttpServletResponse resp) {
         int userId = getRequiredUserId(req);
         int articleId = requiredIntParam(req, "id");
-        String content = optionalParam(req, "content");
+        String content = optionalRawParam(req, "content");
         if (content != null) content = HtmlSanitizer.sanitizeArticleContent(content);
 
         var article = ArticleService.saveArticle(articleId, content, userId);

@@ -48,6 +48,24 @@ class HtmlSanitizerTest {
     }
 
     @Test
+    void sanitizeArticleContent_preservesMarkdownLineBreaks() {
+        String input = "# Title\n\nParagraph with **bold**.\n\n## Checklist\n- [x] Done\n- [ ] Todo";
+        String result = HtmlSanitizer.sanitizeArticleContent(input);
+
+        assertEquals(input, result);
+    }
+
+    @Test
+    void sanitizeArticleContent_removesScriptButKeepsMarkdownShape() {
+        String input = "# Title\n\n<script>alert('xss')</script>\n\n- [x] Done";
+        String result = HtmlSanitizer.sanitizeArticleContent(input);
+
+        assertFalse(result.contains("<script"));
+        assertTrue(result.contains("# Title\n\n"));
+        assertTrue(result.contains("\n\n- [x] Done"));
+    }
+
+    @Test
     void stripHtml_removesAllTags() {
         String input = "<p>Hello <b>world</b></p><script>xss</script>";
         assertEquals("Hello world", HtmlSanitizer.stripHtml(input));

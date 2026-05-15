@@ -1,5 +1,10 @@
-import { useState, useEffect, useCallback, useMemo, memo, useRef } from "react";
+import { useState, useEffect, useCallback, memo, useRef } from "react";
 import { useParams, useNavigate } from "react-router-dom";
+import ReactMarkdown from "react-markdown";
+import remarkGfm from "remark-gfm";
+import rehypeRaw from "rehype-raw";
+import rehypeSanitize from "rehype-sanitize";
+import rehypeHighlight from "rehype-highlight";
 import { articleApi } from "../api";
 import { useAuthStore } from "../stores/auth";
 import { ArticleStatus, type ArticleVO, type CommentItem } from "../api/types";
@@ -7,10 +12,6 @@ import { useChat } from "../hooks/useChat";
 import { useChatStore } from "../stores/chat";
 import { ChatSidebar } from "../components/ChatSidebar";
 import { ConfirmModal } from "../components/Modal";
-import DOMPurify from "dompurify";
-import { marked } from "marked";
-import { markedHighlight } from "marked-highlight";
-import hljs from "highlight.js";
 import {
   Edit3,
   Heart,
@@ -24,21 +25,103 @@ import {
   Shield,
 } from "lucide-react";
 
-marked.use(
-  markedHighlight({
-    highlight(code: string, lang: string) {
-      if (lang && hljs.getLanguage(lang)) {
-        return hljs.highlight(code, { language: lang }).value;
-      }
-      return hljs.highlightAuto(code).value;
-    },
-  }),
-);
+const MAX_TITLE_LENGTH = 200;
 
-/** Extract first H1 from markdown content */
+/** Parse top-level markdown title from a single ATX H1 line */
+function parseTitleLine(line: string): string {
+  const match = line.match(/^ {0,3}#\s+(\S.*)$/);
+  if (!match) return "";
+
+  return match[1]!.replace(/\s+#+\s*$/, "").trim();
+}
+
+/** Extract document title from first non-empty markdown line only */
 function extractTitle(md: string): string {
-  const match = md.match(/^#\s+(.+)$/m);
-  return match ? match[1]!.trim() : "";
+  for (const line of md.split(/\r?\n/)) {
+    if (!line.trim()) continue;
+    const title = parseTitleLine(line);
+    return title.length > MAX_TITLE_LENGTH ? "" : title;
+  }
+
+  return "";
+}
+
+function escapeRegExp(text: string): string {
+  return text.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+}
+
+function looksLikeFlattenedMarkdown(md: string): boolean {
+  const normalized = md.replace(/\r\n?/g, "\n");
+  const lineCount = normalized.split("\n").length;
+  return (
+    lineCount <= 3 &&
+    (/^\s*#{1,6}\s+.+\s+#{1,6}\s+/.test(normalized) ||
+      /\s#{1,6}\s+|\s[-*+]\s+(?:\[[ xX]\]\s*)?|```|\s>\s+|\s\|\s*:?[-]{3,}/.test(
+        normalized,
+      ))
+  );
+}
+
+function isUsableStoredTitle(title?: string): title is string {
+  const value = title?.trim() || "";
+  return Boolean(
+    value &&
+      value.length < MAX_TITLE_LENGTH &&
+      !looksLikeFlattenedMarkdown(value) &&
+      !/[#>*`]|\[[ xX]\]/.test(value),
+  );
+}
+
+function repairLeadingH1(md: string, title?: string): string {
+  const storedTitle = isUsableStoredTitle(title) ? title.trim() : "";
+  if (storedTitle) {
+    const byStoredTitle = md.replace(
+      new RegExp(`^\\s*#\\s+${escapeRegExp(storedTitle)}\\s+`),
+      `# ${storedTitle}\n\n`,
+    );
+    if (byStoredTitle !== md) return byStoredTitle;
+  }
+
+  // Old flattened rows can look like: "# Title First paragraph ... ## Next".
+  // If DB title is already polluted, split short title before common paragraph starter.
+  return md.replace(
+    /^\s*#\s+(.{1,80}?)(?=\s+(?:The|A|An|This|That|These|Those|In|On|At|When|While|Once|As|But|However|Unlike|I|We|You|He|She|They|It|本文|我们|在|当|一个|一种|这个|那个|这|那)\b)/,
+    (_match, heading: string) => `# ${heading.trim()}\n\n`,
+  );
+}
+
+/** Best-effort repair for old articles saved after Jsoup collapsed Markdown newlines */
+function restoreFlattenedMarkdown(md: string, title?: string): string {
+  let normalized = decodeHtmlEntities(md.replace(/\r\n?/g, "\n"));
+
+  // Some transport/storage bugs keep literal "\\n" instead of real newlines.
+  if (!normalized.includes("\n") && /\\n/.test(normalized)) {
+    normalized = normalized.replace(/\\r\\n|\\n|\\r/g, "\n");
+  }
+
+  if (!looksLikeFlattenedMarkdown(normalized)) return normalized;
+
+  return repairLeadingH1(normalized, title)
+    .replace(/([^\n])\s+(#{1,6}\s+)/g, "$1\n\n$2")
+    .replace(/\s+([*-+]\s+(?:\[[ xX]\]\s*)?)/g, "\n$1")
+    .replace(/([^\n])\s+(>\s+)/g, "$1\n\n$2")
+    .replace(/(#{2,6}\s+[^\n#`]+?)\s+([A-Za-z][A-Za-z0-9_+-]{1,20})\s+```\s*/g, "$1\n\n```$2\n")
+    .replace(/([^\n])\s+(```\s*[A-Za-z0-9_-]*)\s*/g, "$1\n\n$2\n")
+    .replace(/\s+```\s+/g, "\n```\n\n")
+    .replace(/\s+(\|\s*:?[-]{3,}[^\n]*)/g, "\n$1")
+    .replace(/\n{3,}/g, "\n\n")
+    .trim();
+}
+
+function getDisplayTitle(article: ArticleVO, content: string): string {
+  const extractedTitle = extractTitle(content);
+  if (extractedTitle) return extractedTitle;
+
+  const storedTitle = article.title?.trim() || "";
+  if (!isUsableStoredTitle(storedTitle)) {
+    return "无标题";
+  }
+  return storedTitle;
 }
 
 /** Decode common HTML entities back to plain code text */
@@ -74,16 +157,34 @@ function normalizeHighlightedCodeFences(md: string): string {
   });
 }
 
-/** Remove first H1 from markdown body so page header own title */
+/** Remove top document H1 from markdown body so page header owns title */
 function stripFirstH1(md: string): string {
-  return md.replace(/^#\s+.+\n+/m, "").trim();
+  const lines = md.split(/\r?\n/);
+  const titleLineIndex = lines.findIndex((line) => line.trim() !== "");
+
+  if (titleLineIndex !== -1) {
+    const title = parseTitleLine(lines[titleLineIndex]!);
+    if (title && title.length <= MAX_TITLE_LENGTH) {
+      lines.splice(titleLineIndex, 1);
+      while (titleLineIndex < lines.length && lines[titleLineIndex] === "") {
+        lines.splice(titleLineIndex, 1);
+      }
+    }
+  }
+
+  return lines.join("\n").trim();
 }
 
-const ArticleContent = memo(function ArticleContent({ html }: { html: string }) {
+const ArticleContent = memo(function ArticleContent({ content }: { content: string }) {
   return (
     <div className="article-content mb-12 text-on-surface">
-      {html ? (
-        <div dangerouslySetInnerHTML={{ __html: html }} />
+      {content ? (
+        <ReactMarkdown
+          remarkPlugins={[remarkGfm]}
+          rehypePlugins={[rehypeRaw, rehypeSanitize, rehypeHighlight]}
+        >
+          {content}
+        </ReactMarkdown>
       ) : (
         <p className="text-on-surface-variant">暂无内容</p>
       )}
@@ -266,8 +367,9 @@ export function ArticleDetailPage() {
   };
 
   const articleContent = article?.content || "";
-  const displayTitle = extractTitle(articleContent) || article?.title || "";
-  const renderedContent = normalizeHighlightedCodeFences(stripFirstH1(articleContent));
+  const repairedContent = article ? restoreFlattenedMarkdown(articleContent, article.title) : articleContent;
+  const displayTitle = article ? getDisplayTitle(article, repairedContent) : "";
+  const renderedContent = normalizeHighlightedCodeFences(stripFirstH1(repairedContent));
   const accessSummary = article ? getArticleAccessSummary(article) : "";
   const permissionOptions = [
     {
@@ -285,10 +387,6 @@ export function ArticleDetailPage() {
       onClick: () => handlePermissionChange(ArticleStatus.PUBLISHED),
     },
   ];
-  const renderedHtml = useMemo(
-    () => (renderedContent ? DOMPurify.sanitize(marked(renderedContent) as string) : ""),
-    [renderedContent],
-  );
 
   if (loading || !article) {
     return (
@@ -437,7 +535,7 @@ export function ArticleDetailPage() {
             </div>
 
             {/* Content */}
-            <ArticleContent html={renderedHtml} />
+            <ArticleContent content={renderedContent} />
           </article>
 
           {/* Comments Section */}
