@@ -187,6 +187,8 @@ public class BaseMapper<E> {
         if (type == Long.class) return rs.getObject(fm.columnName, Long.class);
         if (type == long.class) return rs.getLong(fm.columnName);
         if (type == String.class) return rs.getString(fm.columnName);
+        if (type == Boolean.class) return rs.getObject(fm.columnName, Boolean.class);
+        if (type == boolean.class) return rs.getBoolean(fm.columnName);
         return rs.getObject(fm.columnName);
     }
 

@@ -477,6 +477,13 @@ public class Db {
 
         private static final ConcurrentHashMap<Class<?>, BeanMeta<?>> CACHE = new ConcurrentHashMap<>();
 
+        static final Set<Class<?>> SCALAR_TYPES = Set.of(
+            Integer.class, int.class, Long.class, long.class,
+            Double.class, double.class, Float.class, float.class,
+            Short.class, short.class, Byte.class, byte.class,
+            Boolean.class, boolean.class, String.class
+        );
+
         private final BeanMeta<T> meta;
 
         @SuppressWarnings("unchecked")
@@ -491,6 +498,9 @@ public class Db {
         @Override
         public T mapRow(ResultSet rs) throws SQLException {
             try {
+                if (SCALAR_TYPES.contains(meta.clazz)) {
+                    return readScalar(rs);
+                }
                 T instance = meta.constructor.newInstance();
                 for (ColMeta cm : meta.columns) {
                     Object value = readColumn(rs, cm);
@@ -510,7 +520,23 @@ public class Db {
             if (type == Long.class) return rs.getObject(cm.columnLabel, Long.class);
             if (type == long.class) return rs.getLong(cm.columnLabel);
             if (type == String.class) return rs.getString(cm.columnLabel);
+            if (type == Boolean.class) return rs.getObject(cm.columnLabel, Boolean.class);
+            if (type == boolean.class) return rs.getBoolean(cm.columnLabel);
             return rs.getObject(cm.columnLabel);
+        }
+
+        @SuppressWarnings("unchecked")
+        private T readScalar(ResultSet rs) throws SQLException {
+            Class<?> clazz = meta.clazz;
+            if (clazz == Integer.class || clazz == int.class) return (T) Integer.valueOf(rs.getInt(1));
+            if (clazz == Long.class || clazz == long.class) return (T) Long.valueOf(rs.getLong(1));
+            if (clazz == String.class) return (T) rs.getString(1);
+            if (clazz == Double.class || clazz == double.class) return (T) Double.valueOf(rs.getDouble(1));
+            if (clazz == Float.class || clazz == float.class) return (T) Float.valueOf(rs.getFloat(1));
+            if (clazz == Boolean.class || clazz == boolean.class) return (T) Boolean.valueOf(rs.getBoolean(1));
+            if (clazz == Short.class || clazz == short.class) return (T) Short.valueOf(rs.getShort(1));
+            if (clazz == Byte.class || clazz == byte.class) return (T) Byte.valueOf(rs.getByte(1));
+            return (T) rs.getObject(1);
         }
     }
 
@@ -522,6 +548,11 @@ public class Db {
         @SuppressWarnings("unchecked")
         BeanMeta(Class<?> clazz) {
             this.clazz = (Class<T>) clazz;
+            if (BeanMapper.SCALAR_TYPES.contains(clazz)) {
+                this.constructor = null;
+                this.columns = List.of();
+                return;
+            }
             try {
                 this.constructor = (Constructor<T>) clazz.getDeclaredConstructor();
                 this.constructor.setAccessible(true);
