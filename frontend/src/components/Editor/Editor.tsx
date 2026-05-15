@@ -6,7 +6,7 @@ import "@uiw/react-textarea-code-editor/dist.css";
 
 import { Crepe } from "@milkdown/crepe";
 
-import { Editor, editorStateCtx, EditorStateReady } from "@milkdown/kit/core";
+import { Editor, editorStateCtx, editorViewCtx, prosePluginsCtx, EditorStateReady } from "@milkdown/kit/core";
 import { listenerCtx } from "@milkdown/kit/plugin/listener";
 import { collab, collabServiceCtx, CollabReady, CollabService } from "@milkdown/plugin-collab";
 import { Milkdown, MilkdownProvider, useEditor } from "@milkdown/react";
@@ -252,20 +252,22 @@ function MilkdownEditorInner({
   initialContent,
   shouldBootstrap,
 }: MilkdownEditorInnerProps) {
-  // Track whether this editor instance is still alive.
   const aliveRef = useRef(true);
   const editorReadyRef = useRef(false);
 
+  // Stable refs so useEditor factory does NOT recreate when yDoc/awareness mutate
+  const yDocRef = useRef(yDoc);
+  yDocRef.current = yDoc;
+  const awarenessRef = useRef(awareness);
+  awarenessRef.current = awareness;
+
   // Observe Yjs doc changes and forward to onChange.
-  // milkdown's markdownUpdated may not fire for remote Yjs updates,
-  // so we listen on the Yjs XmlFragment directly as a reliable fallback.
   useEffect(() => {
     const fragment = yDoc.getXmlFragment("prosemirror");
     let timer: ReturnType<typeof setTimeout> | null = null;
 
     const observer = () => {
       if (!aliveRef.current) return;
-      // Debounce: coalesce rapid updates (both local and remote)
       if (timer) clearTimeout(timer);
       timer = setTimeout(() => {
         const ed = editorRef.current;
@@ -303,7 +305,6 @@ function MilkdownEditorInner({
       },
     });
 
-    // Add collab + listener to the internal editor
     crepe.editor
       .use(collab)
       .config((ctx) => {
@@ -322,8 +323,8 @@ function MilkdownEditorInner({
             collabServiceRef.current = collabService;
 
             collabService
-              .bindDoc(yDoc)
-              .setAwareness(awareness)
+              .bindDoc(yDocRef.current)
+              .setAwareness(awarenessRef.current)
               .setOptions({
                 yCursorOpts: {
                   cursorBuilder: (user: { name: string; color: string }) => cursorBuilder(user),
@@ -335,6 +336,16 @@ function MilkdownEditorInner({
             }
 
             collabService.connect();
+
+            // Remove ProseMirror's history plugin — yUndoPlugin handles undo/redo in collab mode.
+            // Without this, PM history records remote sync transactions as empty stack items.
+            // eslint-disable-next-line @typescript-eslint/no-explicit-any
+            const plugins = ctx.get(prosePluginsCtx).filter(
+              (p) => !((p as any).key?.key?.startsWith?.("history"))
+            );
+            ctx.set(prosePluginsCtx, plugins);
+            const view = ctx.get(editorViewCtx);
+            view.updateState(view.state.reconfigure({ plugins }));
           } catch (error) {
             if (aliveRef.current) {
               console.warn("Collaboration setup skipped", error);
@@ -344,14 +355,13 @@ function MilkdownEditorInner({
       });
 
     return crepe;
-  }, [yDoc, awareness]);
+  }, []);
 
   useEffect(() => {
     const ed = get();
     if (ed) editorRef.current = ed;
   }, [get, editorRef]);
 
-  // Mark dead on unmount or before next factory call
   useEffect(() => {
     return () => {
       aliveRef.current = false;
@@ -359,7 +369,7 @@ function MilkdownEditorInner({
       editorRef.current = null;
       collabServiceRef.current = null;
     };
-  }, [yDoc, awareness]);
+  }, []);
 
   return <Milkdown />;
 }
