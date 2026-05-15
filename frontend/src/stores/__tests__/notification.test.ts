@@ -19,7 +19,6 @@ describe('useNotificationStore', () => {
       unreadCount: 0,
       notifications: [],
       loading: false,
-      ws: null,
     })
   })
 

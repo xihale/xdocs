@@ -40,15 +40,11 @@ export function NotificationPanel() {
     fetchNotifications,
     markRead,
     markAllRead,
-    connectWs,
-    disconnectWs,
   } = useNotificationStore();
 
-  // Initial fetch + WebSocket
+  // Initial fetch
   useEffect(() => {
     fetchUnreadCount();
-    connectWs();
-    return () => disconnectWs();
   }, []);
 
   // Close on click outside

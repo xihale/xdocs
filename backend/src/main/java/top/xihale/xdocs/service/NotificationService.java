@@ -29,8 +29,7 @@ public class NotificationService {
         try {
             Notification notification = new Notification(userId, type.getCode(), title, content, link, senderId);
             NotificationDao.insert(notification);
-            // 实时推送
-            pushToUser(userId, notification);
+            // 通知已持久化到 DB，前端打开通知面板时拉取
         } catch (Exception e) {
             // 通知表不存在或写入失败，不影响主业务
             System.getLogger(NotificationService.class.getName())
@@ -257,18 +256,5 @@ public class NotificationService {
         if (user == null) return "未知用户";
         return user.getNickname() != null && !user.getNickname().isBlank()
                 ? user.getNickname() : user.getUsername();
-    }
-
-    // ==================== WebSocket 推送 ====================
-
-    private static void pushToUser(int userId, Notification notification) {
-        try {
-            var ws = top.xihale.xdocs.websocket.NotificationWebSocket.getInstance();
-            if (ws != null) {
-                ws.sendToUser(userId, toVO(notification));
-            }
-        } catch (Exception e) {
-            // WebSocket 推送失败不影响业务
-        }
     }
 }

@@ -6,22 +6,18 @@ interface NotificationState {
   unreadCount: number;
   notifications: NotificationItem[];
   loading: boolean;
-  ws: WebSocket | null;
 
   fetchUnreadCount: () => Promise<void>;
   fetchNotifications: () => Promise<void>;
   markRead: (id: number) => Promise<void>;
   markAllRead: () => Promise<void>;
   deleteNotification: (id: number) => Promise<void>;
-  connectWs: () => void;
-  disconnectWs: () => void;
 }
 
-export const useNotificationStore = create<NotificationState>((set, get) => ({
+export const useNotificationStore = create<NotificationState>((set) => ({
   unreadCount: 0,
   notifications: [],
   loading: false,
-  ws: null,
 
   fetchUnreadCount: async () => {
     try {
@@ -80,55 +76,6 @@ export const useNotificationStore = create<NotificationState>((set, get) => ({
       });
     } catch {
       // ignore
-    }
-  },
-
-  connectWs: () => {
-    const existing = get().ws;
-    if (existing && existing.readyState === WebSocket.OPEN) return;
-
-    const protocol = window.location.protocol === "https:" ? "wss:" : "ws:";
-    const wsUrl = `${protocol}//${window.location.host}/api/notification/ws`;
-    const ws = new WebSocket(wsUrl);
-
-    ws.onmessage = (event) => {
-      try {
-        const msg = JSON.parse(event.data);
-        if (msg.type === "notification" && msg.data) {
-          const notification = msg.data as NotificationItem;
-          set((s) => ({
-            notifications: [notification, ...s.notifications].slice(0, 50),
-            unreadCount: s.unreadCount + 1,
-          }));
-        } else if (msg.type === "unread_count") {
-          set({ unreadCount: msg.count });
-        }
-      } catch {
-        // ignore
-      }
-    };
-
-    ws.onclose = () => {
-      set({ ws: null });
-      // Reconnect after 5 seconds
-      setTimeout(() => {
-        if (!get().ws) get().connectWs();
-      }, 5000);
-    };
-
-    ws.onerror = () => {
-      ws.close();
-    };
-
-    set({ ws });
-  },
-
-  disconnectWs: () => {
-    const ws = get().ws;
-    if (ws) {
-      ws.onclose = null; // prevent reconnect
-      ws.close();
-      set({ ws: null });
     }
   },
 }));
